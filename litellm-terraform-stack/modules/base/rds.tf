@@ -51,14 +51,14 @@ resource "aws_db_subnet_group" "main" {
 resource "aws_db_parameter_group" "example_pg" {
   name   = "rds-postgres-parameter-group"
   # Update the family to match your PostgreSQL version
-  family = "postgres17"
+  family = "postgres18"
 }
 
 # Database #1: litellm
 resource "aws_db_instance" "database" {
   identifier                = "${var.name}-litellm-db"
   engine                    = "postgres"
-  engine_version           = "17"
+  engine_version           = "18"
   instance_class            = var.rds_instance_class
   storage_type              = "gp3"
   allocated_storage         = var.rds_allocated_storage

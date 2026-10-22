@@ -32,7 +32,7 @@ resource "aws_elasticache_subnet_group" "redis_subnet_group" {
 
 resource "aws_elasticache_parameter_group" "redis_parameter_group" {
   name               = "${var.name}-redis-parameter-group"
-  family             = "valkey8"
+  family             = "valkey9"
   description        = "Redis parameter group"
   parameter {
     name  = "timeout" 
@@ -55,7 +55,7 @@ resource "aws_elasticache_replication_group" "redis" {
   replication_group_id          = "${var.name}-redis"
   description = "redis"
   engine                        = "valkey"
-  engine_version                = "8.2"
+  engine_version                = "9.1"
   node_type = var.redis_node_type
   num_cache_clusters = var.redis_num_cache_clusters
   automatic_failover_enabled    = var.redis_num_cache_clusters > 1
