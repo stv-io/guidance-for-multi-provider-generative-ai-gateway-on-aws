@@ -329,6 +329,12 @@ if [ -n "${LANGFUSE_PUBLIC_KEY}" ] && [ -n "${LANGFUSE_SECRET_KEY}" ]; then
     echo "Updated config.yaml with 'langfuse' added to success callback array"
 fi
 
+# Response cache TTL: without one, cached entries are never evicted (volatile-lru) and fill Valkey
+if yq e '.litellm_settings.cache_params' config/config.yaml | grep -q "^[^#n]"; then
+    yq e ".litellm_settings.cache_params.ttl = ${LITELLM_CACHE_TTL_SECONDS:-3600}" -i config/config.yaml
+    echo "Set response cache TTL to ${LITELLM_CACHE_TTL_SECONDS:-3600}s"
+fi
+
 echo "Deploying litellm-terraform-stack"
 cd litellm-terraform-stack
 
@@ -394,6 +400,9 @@ export TF_VAR_cloudfront_certificate_arn=${CLOUDFRONT_CERTIFICATE_ARN:-}
 export TF_VAR_cloudfront_waf=${CLOUDFRONT_WAF:-true}
 export TF_VAR_cloudfront_waf_rate_limit=${CLOUDFRONT_WAF_RATE_LIMIT:-2000}
 export TF_VAR_nat_gateway_per_az=${NAT_GATEWAY_PER_AZ:-false}
+export TF_VAR_alarm_email=${ALARM_EMAIL:-}
+export TF_VAR_bedrock_monthly_budget_usd=${BEDROCK_MONTHLY_BUDGET_USD:-100}
+export TF_VAR_bedrock_tokens_per_hour_alarm=${BEDROCK_TOKENS_PER_HOUR_ALARM:-2000000}
 
 # Display CloudFront and Route53 configuration
 echo "USE_ROUTE53: $USE_ROUTE53"

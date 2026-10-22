@@ -334,6 +334,36 @@ for lg in "/ecs/${MAIN_STACK_NAME}-litellm" "/ecs/${MAIN_STACK_NAME}-middleware"
 done
 [ -z "$leaks" ] && pass "no master/virtual key in the last 30 min of logs" || fail "found in:$leaks"
 
+# ---------------------------------------------------------------- Spend alarms
+echo "== Spend alarms"
+CURRENT=X1
+if [ -z "${ALARM_EMAIL:-}" ]; then skip "ALARM_EMAIL not set"; else
+  acct=$(aws sts get-caller-identity --query Account --output text)
+  budget=$(aws budgets describe-budget --account-id "$acct" --budget-name "${MAIN_STACK_NAME}-bedrock-monthly" --query Budget --output json 2>/dev/null)
+  covered=$(jq -r '.CostFilters.Service // [] | .[]' <<<"$budget" 2>/dev/null | sort)
+  # Every service Cost Explorer has billed for Bedrock in the last 60 days must be in the budget filter
+  billed=$(aws ce get-dimension-values --region us-east-1 --dimension SERVICE \
+    --time-period "Start=$(date -u -v-60d +%F 2>/dev/null || date -u -d '-60 days' +%F),End=$(date -u +%F)" \
+    --query 'DimensionValues[].Value' --output json 2>/dev/null | jq -r '.[] | select(test("Bedrock"))' | sort)
+  missing=$(comm -13 <(echo "$covered") <(echo "$billed") | paste -sd, -)
+  credit=$(jq -r '.CostTypes.IncludeCredit' <<<"$budget" 2>/dev/null)
+  if [ -z "$budget" ]; then fail "budget ${MAIN_STACK_NAME}-bedrock-monthly not found"
+  elif [ -n "$missing" ]; then fail "Bedrock-billed services missing from the budget filter: $missing"
+  elif [ "$credit" != false ]; then fail "budget includes credits (IncludeCredit=$credit)"
+  else pass "\$$(jq -r .BudgetLimit.Amount <<<"$budget") budget, credits excluded, covers all $(echo "$billed" | grep -c .) Bedrock-billed services"; fi
+fi
+
+CURRENT=X2
+if [ -z "${ALARM_EMAIL:-}" ]; then skip "ALARM_EMAIL not set"; else
+  alarm=$(aws cloudwatch describe-alarms --alarm-names "${MAIN_STACK_NAME}-bedrock-tokens-per-hour" --query 'MetricAlarms[0]' --output json 2>/dev/null)
+  topic=$(jq -r '.AlarmActions[0] // empty' <<<"$alarm")
+  sub=$([ -n "$topic" ] && aws sns list-subscriptions-by-topic --topic-arn "$topic" --query "Subscriptions[?Protocol=='email'].SubscriptionArn | [0]" --output text 2>/dev/null)
+  if [ -z "$topic" ]; then fail "tokens-per-hour alarm or its SNS action not found"
+  elif [ "$sub" = PendingConfirmation ]; then fail "alarm $(jq -r .StateValue <<<"$alarm"), but the email subscription is unconfirmed: click the link in the AWS Notifications email"
+  elif [[ "$sub" == arn:aws:sns:* ]]; then pass "alarm $(jq -r .StateValue <<<"$alarm") at $(jq -r .Threshold <<<"$alarm" | cut -d. -f1) tokens/h, email subscription confirmed"
+  else fail "no email subscription on $topic"; fi
+fi
+
 echo
 echo "== $PASSED passed, $FAILED failed, $SKIPPED skipped  (results: ${RESULTS_FILE#$REPO_ROOT/})"
 [ "$FAILED" -eq 0 ]

@@ -352,6 +352,44 @@ variable "cloudfront_waf_rate_limit" {
   default     = 2000
 }
 
+variable "alarm_email" {
+  description = "Recipient of the Bedrock budget and token alarms. Empty = no alarms"
+  type        = string
+  default     = ""
+}
+
+variable "bedrock_monthly_budget_usd" {
+  description = "Monthly Bedrock budget in USD (notifications at 50/80/100% actual and 100% forecast)"
+  type        = number
+  default     = 100
+}
+
+variable "bedrock_tokens_per_hour_alarm" {
+  description = "Bedrock input + output tokens in one hour that raise the near-real-time alarm"
+  type        = number
+  default     = 2000000
+}
+
+variable "bedrock_budget_services" {
+  description = "Cost Explorer service names that make up Bedrock spend. Anthropic models bill as their own '... (Amazon Bedrock Edition)' service; smoke test X1 flags any that are missing"
+  type        = list(string)
+  default = [
+    "Amazon Bedrock",
+    "Claude Haiku 4.5 (Amazon Bedrock Edition)",
+    "Claude Haiku 5.5 (Amazon Bedrock Edition)",
+    "Claude Sonnet 4.5 (Amazon Bedrock Edition)",
+    "Claude Sonnet 4.6 (Amazon Bedrock Edition)",
+    "Claude Sonnet 5 (Amazon Bedrock Edition)",
+    "Claude Sonnet 5.5 (Amazon Bedrock Edition)",
+    "Claude Opus 4.5 (Amazon Bedrock Edition)",
+    "Claude Opus 4.6 (Amazon Bedrock Edition)",
+    "Claude Opus 5 (Amazon Bedrock Edition)",
+    "Claude Opus 5.5 (Amazon Bedrock Edition)",
+    "Claude 3.5 Haiku (Amazon Bedrock Edition)",
+    "Claude 3 Haiku (Amazon Bedrock Edition)",
+  ]
+}
+
 variable "nat_gateway_per_az" {
   description = "One NAT gateway per AZ (each private subnet egresses through its own AZ) instead of a single shared one"
   type        = bool

@@ -199,6 +199,9 @@ export TF_VAR_cloudfront_certificate_arn=${CLOUDFRONT_CERTIFICATE_ARN:-}
 export TF_VAR_cloudfront_waf=${CLOUDFRONT_WAF:-true}
 export TF_VAR_cloudfront_waf_rate_limit=${CLOUDFRONT_WAF_RATE_LIMIT:-2000}
 export TF_VAR_nat_gateway_per_az=${NAT_GATEWAY_PER_AZ:-false}
+export TF_VAR_alarm_email=${ALARM_EMAIL:-}
+export TF_VAR_bedrock_monthly_budget_usd=${BEDROCK_MONTHLY_BUDGET_USD:-100}
+export TF_VAR_bedrock_tokens_per_hour_alarm=${BEDROCK_TOKENS_PER_HOUR_ALARM:-2000000}
 
 if [ -n "${LANGFUSE_HOST}" ]; then
     export TF_VAR_langfuse_host=$LANGFUSE_HOST

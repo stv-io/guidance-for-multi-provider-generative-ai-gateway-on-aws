@@ -401,18 +401,26 @@ router_settings:
 
 environment_variables:
   STORE_MODEL_IN_DB: 'True'
-  LITELLM_LOG: "DEBUG"
+  # DEBUG logs request bodies, i.e. prompts
+  LITELLM_LOG: "INFO"
 
 litellm_settings:
+  # Response cache shared by all keys: an identical request (model, messages, parameters) is
+  # answered from Valkey without calling the model, and costs nothing. A client can bypass it per
+  # request with "cache": {"no-cache": true}.
   cache: True
-  debug: True
-  detailed_debug: True
+  debug: False
+  detailed_debug: False
   cache_params:
     type: redis
     host: os.environ/REDIS_HOST # Redis server hostname or IP address
     port: os.environ/REDIS_PORT # Redis server port (as a string)
     password: os.environ/REDIS_PASSWORD # Redis server password
-    
+    # Seconds. Required, not only for freshness: ElastiCache's volatile-lru policy only evicts keys
+    # that have a TTL, so entries without one fill the node until writes fail - and rate limiting
+    # lives in the same Valkey. deploy.sh sets this from LITELLM_CACHE_TTL_SECONDS.
+    ttl: 3600
+
   max_budget: 1000000000.0 # (float) sets max budget in dollars across the entire proxy across all API keys. Note, the budget does not apply to the master key. That is the only exception.
   budget_duration: 1mo # (str) frequency of budget reset - You can set duration as seconds ("30s"), minutes ("30m"), hours ("30h"), days ("30d"), months ("1mo").
 

@@ -59,6 +59,8 @@ of a cent; `ALL_MODELS=1` costs a few cents.
 | **K5** | Keys | Rate limits are enforced (Valkey shared state) | A key with `rpm_limit: 1` gets 429 on its second request within the minute |
 | **K7** | Keys | Only admins can mint keys (middleware gate) | `POST /key/generate` with the non-admin K1 key returns 403 (runs before K6) |
 | **K6** | Keys | Revocation works | After `POST /key/delete`, the K1 key is rejected (401) |
+| **X1** | Spend | The Bedrock budget sees all Bedrock spend | Budget `<stack>-bedrock-monthly` exists, excludes credits, and its service filter contains every service Cost Explorer billed for Bedrock in the last 60 days (Anthropic models bill as `Claude … (Amazon Bedrock Edition)`) |
+| **X2** | Spend | The near-real-time token alarm can reach someone | Alarm `<stack>-bedrock-tokens-per-hour` exists with an SNS action, and the email subscription is confirmed |
 | **S1** | Security | Secrets are not logged | The last 30 min of the LiteLLM and middleware CloudWatch log groups contain neither the master key nor the K1 key |
 
 ## Adding tests
