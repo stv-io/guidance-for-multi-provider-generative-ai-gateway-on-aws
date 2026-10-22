@@ -1016,7 +1016,7 @@ async def proxy_request(request: Request):
 
 
 def convert_openai_to_bedrock_history(
-    openai_history: List[Dict[str, str]]
+    openai_history: List[Dict[str, str]],
 ) -> Dict[str, Any]:
     system_messages = []
     bedrock_messages = []
