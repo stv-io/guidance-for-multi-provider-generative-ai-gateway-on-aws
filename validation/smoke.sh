@@ -34,7 +34,7 @@ skip() { SKIPPED=$((SKIPPED+1)); printf '  \033[33mSKIP\033[0m %-3s %s\n' "$CURR
 req() {
   local auth=()
   [ -n "$3" ] && auth=(-H "Authorization: Bearer $3")
-  CODE=$(curl -sS -o "$TMP/body" -w '%{http_code}' -X "$1" "$2" "${auth[@]}" \
+  CODE=$(curl -sS -o "$TMP/body" -w '%{http_code}' -X "$1" "$2" ${auth[@]+"${auth[@]}"} \
     -H 'Content-Type: application/json' ${4:+--data "$4"} --max-time 90) || CODE=000
 }
 body() { cat "$TMP/body"; }
@@ -49,11 +49,11 @@ cleanup() {
   rm -rf "$TMP"
 }
 
-gen_key() { # gen_key JSON -> echoes key
+gen_key() { # gen_key JSON -> sets GEN_KEY (not via $(...), so TEMP_KEYS survives for cleanup)
   req POST "$BASE/key/generate" "$MASTER_KEY" "$1"
   local k; k=$(body | jq -r '.key // empty' 2>/dev/null)
   [ -n "$k" ] && TEMP_KEYS+=("$k")
-  echo "$k"
+  GEN_KEY=$k
 }
 
 echo "== Discovering deployment"
@@ -180,6 +180,14 @@ req POST "$BASE/bedrock/model/$DEFAULT_MODEL/converse" "$MASTER_KEY" \
 txt=$(body | jq -r '.output.message.content[0].text // empty' 2>/dev/null)
 [ "$CODE" = 200 ] && [ -n "$txt" ] && pass "converse: \"${txt:0:40}\"" || fail "$CODE $(body | head -c 300)"
 
+CURRENT=M6
+# Responses over ~1 KB are gzip-compressed by LiteLLM; the middleware must not relay a stale
+# Content-Encoding/Content-Length for the body it has already decompressed
+req POST "$BASE/v1/chat/completions" "$MASTER_KEY" \
+  "$(chat_json "$DEFAULT_MODEL" 'Write about 250 words on why clouds form.' | jq -c '.max_tokens=600')"
+len=$(body | jq -r '.choices[0].message.content | length' 2>/dev/null)
+[ "$CODE" = 200 ] && [ "${len:-0}" -gt 1000 ] && pass "long answer relayed intact ($len chars)" || fail "$CODE len=$len"
+
 CURRENT=M5
 if [ "${ALL_MODELS:-0}" = 1 ]; then
   bad=""; n=0
@@ -205,7 +213,7 @@ else fail "no session_id returned ($CODE $(body | head -c 200))"; fi
 # ---------------------------------------------------------------- Keys
 echo "== Keys"
 CURRENT=K1
-KEY=$(gen_key "$(jq -nc --arg m "$DEFAULT_MODEL" '{models:[$m],max_budget:1,key_alias:("smoke-"+(now|tostring)),metadata:{purpose:"validation/smoke.sh"}}')")
+gen_key "$(jq -nc --arg m "$DEFAULT_MODEL" '{models:[$m],max_budget:1,key_alias:("smoke-"+(now|tostring)),metadata:{purpose:"validation/smoke.sh"}}')"; KEY=$GEN_KEY
 [[ "$KEY" == sk-* ]] && pass "virtual key issued (restricted to $DEFAULT_MODEL)" || fail "$CODE $(body | head -c 200)"
 
 CURRENT=H2
@@ -236,7 +244,7 @@ if [ -n "$KEY" ]; then
 else skip "no K1 key"; fi
 
 CURRENT=K5
-RKEY=$(gen_key "$(jq -nc --arg m "$DEFAULT_MODEL" '{models:[$m],rpm_limit:1,key_alias:("smoke-rpm-"+(now|tostring))}')")
+gen_key "$(jq -nc --arg m "$DEFAULT_MODEL" '{models:[$m],rpm_limit:1,key_alias:("smoke-rpm-"+(now|tostring))}')"; RKEY=$GEN_KEY
 if [ -n "$RKEY" ]; then
   req POST "$BASE/v1/chat/completions" "$RKEY" "$(chat_json "$DEFAULT_MODEL")"; c1=$CODE
   req POST "$BASE/v1/chat/completions" "$RKEY" "$(chat_json "$DEFAULT_MODEL")"; c2=$CODE
@@ -262,7 +270,7 @@ since=$(( ($(date +%s) - 1800) * 1000 )); leaks=""
 for lg in "/ecs/${MAIN_STACK_NAME}-litellm" "/ecs/${MAIN_STACK_NAME}-middleware"; do
   for secret in "$MASTER_KEY" ${KEY:+"$KEY"}; do
     hits=$(aws logs filter-log-events --log-group-name "$lg" --start-time "$since" --filter-pattern "\"$secret\"" \
-      --query 'length(events)' --output text 2>/dev/null || echo err)
+      --query 'length(events)' --output text 2>/dev/null | awk '{s+=$1} END{print s+0}' || echo err)
     [ "$hits" = 0 ] || leaks="$leaks $lg($hits)"
   done
 done

@@ -51,7 +51,10 @@ provider "aws" {
   }
 }
 
+# AppRegistry closed to new customers on 2026-07-30 (CreateApplication returns AccessDenied),
+# so it is opt-in for accounts that already use it.
 resource "aws_servicecatalogappregistry_application" "solution_application" {
+  count       = var.create_appregistry_application ? 1 : 0
   name        = "${local.SolutionNameKeySatisfyingRestrictions}-${data.aws_region.current.region}-${data.aws_caller_identity.current.account_id}"
   description = "Service Catalog application to track and manage all your resources for the solution ${local.common_labels.SolutionNameKey}"
 

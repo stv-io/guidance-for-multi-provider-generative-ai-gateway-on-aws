@@ -44,6 +44,23 @@ app.add_middleware(
 LITELLM_ENDPOINT = "http://localhost:4000"
 LITELLM_CHAT = f"{LITELLM_ENDPOINT}/v1/chat/completions"
 
+# Headers that must not be copied from a LiteLLM response onto ours: httpx/aiohttp have already
+# decompressed and de-chunked the body, so the upstream encoding and length no longer apply.
+HOP_BY_HOP_HEADERS = {
+    "content-length",
+    "transfer-encoding",
+    "content-encoding",
+    "connection",
+    "keep-alive",
+    "server",
+    "date",
+}
+
+
+def relay_headers(headers) -> Dict[str, str]:
+    return {k: v for k, v in headers.items() if k.lower() not in HOP_BY_HOP_HEADERS}
+
+
 print(f"AWS_REGION: {os.getenv('AWS_REGION')}")
 print(f"AWS_DEFAULT_REGION: {os.getenv('AWS_DEFAULT_REGION')}")
 bedrock_client = boto3.client("bedrock-agent")
@@ -803,6 +820,8 @@ async def get_chat_stream(
 
                 # Check for sentinel lines
                 if line.startswith("data: [DONE]"):
+                    # Forward the terminator: OpenAI-compatible clients wait for it
+                    yield b"data: [DONE]\n\n"
                     break
 
                 # The OpenAI-like endpoints often prepend "data: " before JSON
@@ -851,21 +870,9 @@ async def get_chat_stream(
     # Build the StreamingResponse using our generator
     sresponse = StreamingResponse(stream_events(), media_type="text/event-stream")
 
-    # Exclude certain hop-by-hop or irrelevant headers
-    excluded_headers = {
-        "content-length",
-        "transfer-encoding",
-        "content-encoding",
-        "connection",
-        "keep-alive",
-        "server",
-        "date",
-    }
-
     # Attach upstream headers to our outgoing response
-    for k, v in response_headers.items():
-        if k.lower() not in excluded_headers:
-            sresponse.headers[k] = v
+    for k, v in relay_headers(response_headers).items():
+        sresponse.headers[k] = v
 
     return sresponse
 
@@ -975,9 +982,7 @@ async def proxy_request(request: Request):
                     headers=headers,
                     json=data,
                 ) as resp:
-                    response_headers = dict(resp.headers)
-                    # Avoid passing through invalid content-length
-                    response_headers.pop("Content-Length", None)
+                    response_headers = relay_headers(resp.headers)
                     response_dict = await resp.json()
 
             # If there's a response from the assistant, save it to history
@@ -1167,7 +1172,7 @@ async def forward_key_generate(request: Request):
         return Response(
             content=response.content,
             status_code=response.status_code,
-            headers=response.headers,
+            headers=relay_headers(response.headers),
         )
 
 
@@ -1228,7 +1233,7 @@ async def forward_user_new(request: Request):
         return Response(
             content=response.content,
             status_code=response.status_code,
-            headers=response.headers,
+            headers=relay_headers(response.headers),
         )
 
 

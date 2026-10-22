@@ -42,6 +42,7 @@ of a cent; `ALL_MODELS=1` costs a few cents.
 | **M2** | Models | Streaming works end to end through CloudFront | `stream: true` yields `data:` chunks and terminates with `[DONE]` |
 | **M3** | Models | Embeddings work | `POST /v1/embeddings` (`amazon.titan-embed-text-v2:0`) returns a 1024-dimension vector |
 | **M4** | Models | Bedrock-native API (middleware) | `POST /bedrock/model/<id>/converse` returns `output.message.content[0].text` |
+| **M6** | Models | Large (gzip-compressed) responses survive the middleware relay | A ~250-word non-streaming answer returns 200 with > 1000 characters |
 | **M5** | Models | Every configured chat model answers (`ALL_MODELS=1` only) | Each chat model in `config/config.yaml` returns 200 |
 | **H1** | History | Chat history persists in Postgres | Chat with `enable_history: true` returns a `session_id`; a follow-up with that `session_id` succeeds; `POST /chat-history` returns ≥ 4 messages |
 | **H2** | History | History is bound to its owner | `POST /chat-history` for that session using a *different* key returns 401 |

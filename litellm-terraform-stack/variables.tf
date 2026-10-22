@@ -399,3 +399,9 @@ variable "cloudfront_certificate_arn" {
   type        = string
   default     = ""
 }
+
+variable "create_appregistry_application" {
+  description = "Create a Service Catalog AppRegistry application for the solution (only for accounts that already use AppRegistry; it is closed to new customers)"
+  type        = bool
+  default     = false
+}
