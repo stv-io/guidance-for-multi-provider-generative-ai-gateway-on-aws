@@ -27,7 +27,6 @@ from okta_jwt_verifier import AccessTokenVerifier
 from okta_jwt_verifier.jwt_utils import JWTUtils
 from fastapi.middleware.cors import CORSMiddleware
 import aiohttp
-from contextlib import asynccontextmanager
 from anyio import to_thread
 
 app = FastAPI()
@@ -64,18 +63,18 @@ if OKTA_AUDIENCE and OKTA_ISSUER:
     )
 else:
     print(
-        f"OKTA_AUDIENCE or OKTA_ISSUER are empty. Support for Okta JWT Auth is disabled."
+        "OKTA_AUDIENCE or OKTA_ISSUER are empty. Support for Okta JWT Auth is disabled."
     )
 
 
 def setup_database():
     to_thread.current_default_thread_limiter().total_tokens = 1000
     print("Thread limiter configured")
-    print(f"setting up database")
+    print("setting up database")
     try:
         database_url = os.environ.get("DATABASE_MIDDLEWARE_URL")
         if not database_url:
-            print(f"DATABASE_MIDDLEWARE_URL environment variable not set")
+            print("DATABASE_MIDDLEWARE_URL environment variable not set")
             raise ValueError("DATABASE_MIDDLEWARE_URL environment variable not set")
 
         # Parse the URL to get base connection to postgres database
@@ -164,7 +163,7 @@ def setup_database():
 
 @app.on_event("startup")
 async def startup_event():
-    print(f"doing startup_event")
+    print("doing startup_event")
     global db_engine, chat_sessions
     db_engine, chat_sessions = setup_database()
 
@@ -826,7 +825,7 @@ async def get_chat_stream(
                 # Optionally accumulate partial content
                 choice = chunk_dict["choices"][0]
                 delta = choice.get("delta", {})
-                finish_reason = choice.get("finish_reason", None)
+                finish_reason = choice.get("finish_reason", None)  # noqa: F841
 
                 if history_enabled and "content" in delta and delta["content"]:
                     assistant_content_parts.append(delta["content"])
@@ -1148,11 +1147,11 @@ async def forward_user_new(request: Request):
     body_json = json.loads(request_body)
 
     if not token.startswith("sk-") and access_token_verifier:
-        print(f"token is not api key, assume it is JWT")
+        print("token is not api key, assume it is JWT")
         # Handle as JWT
         try:
             await access_token_verifier.verify(token)
-            print(f"token is verified.")
+            print("token is verified.")
         except Exception as e:
             print(f"exception: {e}")
             # If the JWT verification fails, user is not authorized.
