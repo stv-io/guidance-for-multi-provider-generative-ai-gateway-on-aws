@@ -59,7 +59,7 @@ resource "aws_ecs_task_definition" "fake_server_task_def" {
         logDriver = "awslogs"
         options = {
           "awslogs-group"         = aws_cloudwatch_log_group.fake_server_logs.name
-          "awslogs-region"        = data.aws_region.current.name
+          "awslogs-region"        = data.aws_region.current.region
           "awslogs-stream-prefix" = "FakeServer"
         }
       }
@@ -137,7 +137,7 @@ resource "aws_lb_listener" "fake_server_listener" {
   load_balancer_arn = aws_lb.fake_server_alb.arn
   port              = "443"
   protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-Res-PQ-2025-09"
   certificate_arn   = var.fake_llm_load_testing_endpoint_certifiacte_arn
 
   default_action {
