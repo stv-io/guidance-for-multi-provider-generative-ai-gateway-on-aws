@@ -6,14 +6,6 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.0"
     }
-    helm = {
-      source  = "hashicorp/helm"
-      version = "~> 3.3"
-    }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 3.4"
-    }
     random = {
       source  = "hashicorp/random"
       version = "~> 3.9"
@@ -63,26 +55,5 @@ resource "aws_servicecatalogappregistry_application" "solution_application" {
     "Solutions:SolutionName"    = local.common_labels.SolutionNameKey
     "Solutions:SolutionVersion" = local.common_labels.SolutionVersionKey
     "Solutions:ApplicationType" = "AWS-Solutions"
-  }
-}
-
-
-
-data "aws_eks_cluster_auth" "cluster" {
-  count = local.platform == "EKS" ? 1 : 0
-  name = module.eks_cluster[0].cluster_name
-}
-
-provider "kubernetes" {
-  host                   = local.platform == "EKS" ? module.eks_cluster[0].cluster_endpoint : ""
-  cluster_ca_certificate = local.platform == "EKS" ? base64decode(module.eks_cluster[0].cluster_ca) : ""
-  token = local.platform == "EKS" ? data.aws_eks_cluster_auth.cluster[0].token : ""
-}
-
-provider "helm" {
-  kubernetes = {
-    host                   = local.platform == "EKS" ? module.eks_cluster[0].cluster_endpoint : ""
-    cluster_ca_certificate = local.platform == "EKS" ? base64decode(module.eks_cluster[0].cluster_ca) : ""
-    token = local.platform == "EKS" ? data.aws_eks_cluster_auth.cluster[0].token : ""
   }
 }

@@ -262,7 +262,7 @@ variable "architecture" {
 }
 
 variable "disable_outbound_network_access" {
-    description = "Whether to disable outbound network access for the EKS Cluster"
+    description = "Whether to disable outbound network access from the VPC"
     type = bool
 }
 

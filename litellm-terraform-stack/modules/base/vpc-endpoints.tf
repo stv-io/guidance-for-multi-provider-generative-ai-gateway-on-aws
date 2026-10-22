@@ -36,8 +36,6 @@ resource "aws_vpc_endpoint" "s3_gateway" {
 
 # For each interface endpoint, we do "aws_vpc_endpoint" with type = "Interface" 
 # + the security group above, + subnets = local.chosen_subnet_ids
-# We'll define a local variable listing the services we want in EKS or ECS scenarios,
-# since the CDK has conditionals for EKS. But we’ll just replicate the logic individually.
 
 # Secrets Manager
 resource "aws_vpc_endpoint" "secretsmanager" {
@@ -134,96 +132,4 @@ resource "aws_vpc_endpoint" "bedrock_agent" {
   //subnet_ids               = local.chosen_subnet_ids
   subnet_ids               = local.bedrock_agent_compatible_subnets
   private_dns_enabled      = true
-}
-
-# Additional endpoints if deploymentPlatform == EKS
-#   EKS, EC2, EC2 messages, SSM, SSM messages, CloudWatch monitoring, ELB, ASG, WAFv2
-resource "aws_vpc_endpoint" "eks" {
-  count = local.create_interface_endpoints && var.deployment_platform == "EKS" ? 1 : 0
-  vpc_id                   = local.final_vpc_id
-  service_name             = "com.amazonaws.${data.aws_region.current.region}.eks"
-  vpc_endpoint_type        = "Interface"
-  security_group_ids       = [aws_security_group.vpc_endpoints_sg[0].id]
-  subnet_ids               = local.chosen_subnet_ids
-  private_dns_enabled      = true
-}
-
-resource "aws_vpc_endpoint" "ec2" {
-  count = local.create_interface_endpoints && var.deployment_platform == "EKS" ? 1 : 0
-  vpc_id                   = local.final_vpc_id
-  service_name             = "com.amazonaws.${data.aws_region.current.region}.ec2"
-  vpc_endpoint_type        = "Interface"
-  security_group_ids       = [aws_security_group.vpc_endpoints_sg[0].id]
-  subnet_ids               = local.chosen_subnet_ids
-  private_dns_enabled      = true
-}
-
-resource "aws_vpc_endpoint" "ec2_messages" {
-  count = local.create_interface_endpoints && var.deployment_platform == "EKS" ? 1 : 0
-  vpc_id                   = local.final_vpc_id
-  service_name             = "com.amazonaws.${data.aws_region.current.region}.ec2messages"
-  vpc_endpoint_type        = "Interface"
-  security_group_ids       = [aws_security_group.vpc_endpoints_sg[0].id]
-  subnet_ids               = local.chosen_subnet_ids
-  private_dns_enabled      = true
-}
-
-resource "aws_vpc_endpoint" "ssm" {
-  count = local.create_interface_endpoints && var.deployment_platform == "EKS" ? 1 : 0
-  vpc_id                   = local.final_vpc_id
-  service_name             = "com.amazonaws.${data.aws_region.current.region}.ssm"
-  vpc_endpoint_type        = "Interface"
-  security_group_ids       = [aws_security_group.vpc_endpoints_sg[0].id]
-  subnet_ids               = local.chosen_subnet_ids
-  private_dns_enabled      = true
-}
-
-resource "aws_vpc_endpoint" "ssm_messages" {
-  count = local.create_interface_endpoints && var.deployment_platform == "EKS" ? 1 : 0
-  vpc_id                   = local.final_vpc_id
-  service_name             = "com.amazonaws.${data.aws_region.current.region}.ssmmessages"
-  vpc_endpoint_type        = "Interface"
-  security_group_ids       = [aws_security_group.vpc_endpoints_sg[0].id]
-  subnet_ids               = local.chosen_subnet_ids
-  private_dns_enabled      = true
-}
-
-resource "aws_vpc_endpoint" "cloudwatch_monitoring" {
-  count = local.create_interface_endpoints && var.deployment_platform == "EKS" ? 1 : 0
-  vpc_id                   = local.final_vpc_id
-  service_name             = "com.amazonaws.${data.aws_region.current.region}.monitoring"
-  vpc_endpoint_type        = "Interface"
-  security_group_ids       = [aws_security_group.vpc_endpoints_sg[0].id]
-  subnet_ids               = local.chosen_subnet_ids
-  private_dns_enabled      = true
-}
-
-resource "aws_vpc_endpoint" "elb" {
-  count = local.create_interface_endpoints && var.deployment_platform == "EKS" ? 1 : 0
-  vpc_id                   = local.final_vpc_id
-  service_name             = "com.amazonaws.${data.aws_region.current.region}.elasticloadbalancing"
-  vpc_endpoint_type        = "Interface"
-  security_group_ids       = [aws_security_group.vpc_endpoints_sg[0].id]
-  subnet_ids               = local.chosen_subnet_ids
-  private_dns_enabled      = true
-}
-
-resource "aws_vpc_endpoint" "autoscaling" {
-  count = local.create_interface_endpoints && var.deployment_platform == "EKS" ? 1 : 0
-  vpc_id                   = local.final_vpc_id
-  service_name             = "com.amazonaws.${data.aws_region.current.region}.autoscaling"
-  vpc_endpoint_type        = "Interface"
-  security_group_ids       = [aws_security_group.vpc_endpoints_sg[0].id]
-  subnet_ids               = local.chosen_subnet_ids
-  private_dns_enabled      = true
-}
-
-resource "aws_vpc_endpoint" "wafv2" {
-  count = local.create_interface_endpoints && var.deployment_platform == "EKS" ? 1 : 0
-  vpc_id              = local.final_vpc_id
-  service_name        = "com.amazonaws.${data.aws_region.current.region}.wafv2"
-  vpc_endpoint_type   = "Interface"
-  security_group_ids  = [aws_security_group.vpc_endpoints_sg[0].id]
-  subnet_ids          = local.chosen_subnet_ids
-  private_dns_enabled = true
 }

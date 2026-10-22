@@ -1,19 +1,3 @@
-variable "deployment_platform" {
-  description = "Which platform to deploy (ECS or EKS)"
-  type        = string
-  
-  validation {
-    condition     = can(regex("^(ECS|EKS)$", upper(var.deployment_platform)))
-    error_message = "DEPLOYMENT_PLATFORM must be either 'ECS' or 'EKS' (case insensitive)."
-  }
-}
-
-locals {
-  platform = upper(var.deployment_platform)
-}
-
-# ECS and EKS Variables
-
 variable "name" {
   description = "Standard name to be used as prefix on all resources."
   type        = string
@@ -238,22 +222,22 @@ variable "architecture" {
 }
 
 variable "disable_outbound_network_access" {
-    description = "Whether to disable outbound network access for the EKS Cluster"
+    description = "Whether to disable outbound network access from the VPC"
     type = bool
 }
 
 variable "desired_capacity" {
-  description = "Desired Capacity on the node group and deployment"
+  description = "Desired number of ECS tasks"
   type = number
 }
 
 variable "min_capacity" {
-  description = "Min Capacity on the node group"
+  description = "Minimum number of ECS tasks (autoscaling)"
   type = number
 }
 
 variable "max_capacity" {
-  description = "Max Capacity on the node group"
+  description = "Maximum number of ECS tasks (autoscaling)"
   type = number
 }
 
@@ -262,7 +246,6 @@ variable "public_load_balancer" {
   type = bool
 }
 
-//ECS Only Variables
 variable "cpu_target_utilization_percent" {
   description = "CPU target utilization percent for autoscale"
   type = number
@@ -276,49 +259,6 @@ variable "memory_target_utilization_percent" {
 variable "vcpus" {
   description = "Number of ECS vcpus"
   type = number
-}
-
-# EKS Only Variables
-variable "existing_cluster_name" {
-  description = "Name of the existing EKS Cluster."
-  type        = string
-  default     = ""
-}
-
-variable "cluster_version" {
-  description = "Kubernetes version for Amazon EKS Cluster."
-  type        = string
-  default     = "1.37"
-}
-
-variable "create_cluster" {
-  description = "Controls if EKS cluster should be created"
-  type        = bool
-}
-
-variable "install_add_ons_in_existing_eks_cluster" {
-  description = "Whether to install add ons onto an existing EKS Cluster"
-  type = bool
-}
-
-variable "arm_instance_type" {
-  description = "Instance type for arm deployment"
-  type = string
-}
-
-variable "x86_instance_type" {
-  description = "Instance type for x86 deployment"
-  type = string
-}
-
-variable "arm_ami_type" {
-  description = "AMI type for arm deployment"
-  type = string
-}
-
-variable "x86_ami_type" {
-  description = "AMI type for x86 deployment"
-  type = string
 }
 
 variable "create_vpc_endpoints_in_existing_vpc" {

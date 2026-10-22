@@ -31,12 +31,6 @@ output "VpcId" {
   value       = local.final_vpc_id
 }
 
-# If we created the pull-through cache:
-output "EksAlbControllerPrivateEcrRepositoryName" {
-  description = "ECR repo for EKS ALB Controller (only if outbound disabled + EKS)."
-  value       = (var.disable_outbound_network_access && var.deployment_platform == "EKS") ? aws_ecr_repository.my_ecr_repository[0].name : ""
-}
-
 output "private_subnet_ids" {
   description = "List of IDs of private subnets"
   value = local.creating_new_vpc ? local.new_private_subnet_ids : local.existing_private_subnet_ids

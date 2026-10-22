@@ -195,22 +195,15 @@ echo "AI21_API_KEY: ${AI21_API_KEY:+<set>}"
 echo "LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:+<set>}"
 echo "LANGSMITH_PROJECT: $LANGSMITH_PROJECT"
 echo "LANGSMITH_DEFAULT_RUN_NAME: $LANGSMITH_DEFAULT_RUN_NAME"
-echo "DEPLOYMENT_PLATFORM: $DEPLOYMENT_PLATFORM"
-echo "EXISTING_EKS_CLUSTER_NAME: $EXISTING_EKS_CLUSTER_NAME"
 echo "EXISTING_VPC_ID: $EXISTING_VPC_ID"
 echo "DISABLE_OUTBOUND_NETWORK_ACCESS: $DISABLE_OUTBOUND_NETWORK_ACCESS"
 echo "CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC: $CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC"
-echo "INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER: $INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER"
 echo "DESIRED_CAPACITY: $DESIRED_CAPACITY"
 echo "MIN_CAPACITY: $MIN_CAPACITY"
 echo "MAX_CAPACITY: $MAX_CAPACITY"
 echo "ECS_CPU_TARGET_UTILIZATION_PERCENTAGE: $ECS_CPU_TARGET_UTILIZATION_PERCENTAGE"
 echo "ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE: $ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE"
 echo "ECS_VCPUS: $ECS_VCPUS"
-echo "EKS_ARM_INSTANCE_TYPE: $EKS_ARM_INSTANCE_TYPE"
-echo "EKS_X86_INSTANCE_TYPE: $EKS_X86_INSTANCE_TYPE"
-echo "EKS_ARM_AMI_TYPE: $EKS_ARM_AMI_TYPE"
-echo "EKS_X86_AMI_TYPE: $EKS_X86_AMI_TYPE"
 echo "PUBLIC_LOAD_BALANCER: $PUBLIC_LOAD_BALANCER"
 echo "RDS_INSTANCE_CLASS: $RDS_INSTANCE_CLASS"
 echo "RDS_ALLOCATED_STORAGE_GB: $RDS_ALLOCATED_STORAGE_GB"
@@ -339,7 +332,6 @@ fi
 echo "Deploying litellm-terraform-stack"
 cd litellm-terraform-stack
 
-export TF_VAR_deployment_platform=$DEPLOYMENT_PLATFORM
 export TF_VAR_name=$MAIN_STACK_NAME
 export TF_VAR_vpc_id=$EXISTING_VPC_ID
 export TF_VAR_log_bucket_arn=$LOG_BUCKET_ARN
@@ -349,7 +341,6 @@ export TF_VAR_azure_openai_api_key=$AZURE_OPENAI_API_KEY
 export TF_VAR_azure_api_key=$AZURE_API_KEY
 export TF_VAR_anthropic_api_key=$ANTHROPIC_API_KEY
 export TF_VAR_public_load_balancer=$PUBLIC_LOAD_BALANCER
-export TF_VAR_existing_cluster_name=$EXISTING_EKS_CLUSTER_NAME
 export TF_VAR_groq_api_key=$GROQ_API_KEY
 export TF_VAR_cohere_api_key=$COHERE_API_KEY
 export TF_VAR_co_api_key=$CO_API_KEY
@@ -383,11 +374,6 @@ export TF_VAR_max_capacity=$MAX_CAPACITY
 export TF_VAR_cpu_target_utilization_percent=$ECS_CPU_TARGET_UTILIZATION_PERCENTAGE
 export TF_VAR_memory_target_utilization_percent=$ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE
 export TF_VAR_vcpus=$ECS_VCPUS
-export TF_VAR_install_add_ons_in_existing_eks_cluster=$INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER
-export TF_VAR_arm_instance_type=$EKS_ARM_INSTANCE_TYPE
-export TF_VAR_x86_instance_type=$EKS_X86_INSTANCE_TYPE
-export TF_VAR_arm_ami_type=$EKS_ARM_AMI_TYPE
-export TF_VAR_x86_ami_type=$EKS_X86_AMI_TYPE
 export TF_VAR_create_vpc_endpoints_in_existing_vpc=$CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC
 export TF_VAR_ecrLitellmRepository=$APP_NAME
 export TF_VAR_ecrMiddlewareRepository=$MIDDLEWARE_APP_NAME
@@ -415,12 +401,6 @@ if [ -n "${LANGFUSE_HOST}" ]; then
     export TF_VAR_langfuse_host=$LANGFUSE_HOST
 fi
 
-if [ -n "$EXISTING_EKS_CLUSTER_NAME" ]; then
-    export TF_VAR_create_cluster="false"
-else
-    export TF_VAR_create_cluster="true"
-fi
-
 cat > backend.hcl << EOF
 bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
 key     = "${STACK_ENV:+${STACK_ENV}/}terraform-unified.tfstate"
@@ -430,39 +410,23 @@ EOF
 echo "Generated backend.hcl configuration"
 
 terraform init -backend-config=backend.hcl
-if [ -z "$EXISTING_VPC_ID" ] && [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
-    echo "Deploying base of terraform first for case of new vpc and eks"
-    tf_plan_apply -target=module.base
-fi
 tf_plan_apply
 
 if [ $? -eq 0 ]; then
     echo "Deployment successful. Extracting outputs..."
     
-    if [ "$DEPLOYMENT_PLATFORM" = "ECS" ]; then
-        LITELLM_ECS_CLUSTER=$(terraform output -raw LitellmEcsCluster)
-        LITELLM_ECS_TASK=$(terraform output -raw LitellmEcsTask)
-        SERVICE_URL=$(terraform output -raw ServiceURL)
+    LITELLM_ECS_CLUSTER=$(terraform output -raw LitellmEcsCluster)
+    LITELLM_ECS_TASK=$(terraform output -raw LitellmEcsTask)
+    SERVICE_URL=$(terraform output -raw ServiceURL)
 
-        echo "ServiceURL=$SERVICE_URL" > resources.txt
-        aws ecs update-service \
-            --cluster $LITELLM_ECS_CLUSTER \
-            --service $LITELLM_ECS_TASK \
-            --force-new-deployment \
-            --desired-count $DESIRED_CAPACITY \
-            --no-cli-pager
-    fi
+    echo "ServiceURL=$SERVICE_URL" > resources.txt
+    aws ecs update-service \
+        --cluster $LITELLM_ECS_CLUSTER \
+        --service $LITELLM_ECS_TASK \
+        --force-new-deployment \
+        --desired-count $DESIRED_CAPACITY \
+        --no-cli-pager
 
-    if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
-        EKS_CLUSTER_NAME=$(terraform output -raw eks_cluster_name)
-        EKS_DEPLOYMENT_NAME=$(terraform output -raw eks_deployment_name)
-
-        echo "EKS_DEPLOYMENT_NAME: $EKS_DEPLOYMENT_NAME"
-        echo "EKS_CLUSTER_NAME: $EKS_CLUSTER_NAME"
-        aws eks update-kubeconfig --region $aws_region --name $EKS_CLUSTER_NAME
-        kubectl rollout restart deployment $EKS_DEPLOYMENT_NAME
-    fi
-    
     # Validate CloudFront if enabled
     if [ "$USE_CLOUDFRONT" = "true" ]; then
         echo "Validating CloudFront deployment..."

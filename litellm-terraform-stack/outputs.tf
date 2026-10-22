@@ -1,37 +1,27 @@
 output "LitellmEcsCluster" {
-  value       = try(module.ecs_cluster[0].LitellmEcsCluster, "")
+  value       = try(module.ecs_cluster.LitellmEcsCluster, "")
   description = "Name of the ECS Cluster"
 }
 
 output "LitellmEcsTask" {
-  value       = try(module.ecs_cluster[0].LitellmEcsTask, "")
+  value       = try(module.ecs_cluster.LitellmEcsTask, "")
   description = "Name of the ECS Service"
-}
-
-output "eks_cluster_name" {
-  description = "Name of the EKS cluster"
-  value       = try(module.eks_cluster[0].eks_cluster_name, "")
-}
-
-output "eks_deployment_name" {
-  description = "Name of the Kubernetes deployment"
-  value       = try(module.eks_cluster[0].eks_deployment_name, "")
 }
 
 output "cloudfront_distribution_id" {
   description = "The ID of the CloudFront distribution"
-  value       = var.use_cloudfront ? try(module.ecs_cluster[0].cloudfront_distribution_id, "") : ""
+  value       = var.use_cloudfront ? try(module.ecs_cluster.cloudfront_distribution_id, "") : ""
 }
 
 output "cloudfront_domain_name" {
   description = "The domain name of the CloudFront distribution"
-  value       = var.use_cloudfront ? try(module.ecs_cluster[0].cloudfront_domain_name, "") : ""
+  value       = var.use_cloudfront ? try(module.ecs_cluster.cloudfront_domain_name, "") : ""
 }
 
 output "ServiceURL" {
   description = "The service URL"
   value = var.use_route53 ? "https://${var.record_name}.${var.hosted_zone_name}" : (
-    var.use_cloudfront ? "https://${try(module.ecs_cluster[0].cloudfront_domain_name, "")}" : "https://${try(module.ecs_cluster[0].alb_dns_name, "")}"
+    var.use_cloudfront ? "https://${try(module.ecs_cluster.cloudfront_domain_name, "")}" : "https://${try(module.ecs_cluster.alb_dns_name, "")}"
   )
 }
 
@@ -49,11 +39,11 @@ output "ConfigBucketName" {
 # This allows for troubleshooting and verification if needed
 output "cloudfront_auth_secret" {
   description = "The CloudFront authentication secret (only shown once after creation)"
-  value       = var.use_cloudfront ? try(module.ecs_cluster[0].cloudfront_auth_secret, null) : null
+  value       = var.use_cloudfront ? try(module.ecs_cluster.cloudfront_auth_secret, null) : null
   sensitive   = true
 }
 
 output "alb_dns_name" {
   description = "The DNS name of the ALB (ECS deployments)"
-  value       = try(module.ecs_cluster[0].alb_dns_name, "")
+  value       = try(module.ecs_cluster.alb_dns_name, "")
 }

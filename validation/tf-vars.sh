@@ -18,7 +18,6 @@ set +a
 
 eval "$(grep -E '^export TF_VAR_[a-zA-Z0-9_]+=' deploy.sh)"
 [ -n "${LANGFUSE_HOST:-}" ] && export TF_VAR_langfuse_host=$LANGFUSE_HOST
-if [ -n "$EXISTING_EKS_CLUSTER_NAME" ]; then export TF_VAR_create_cluster="false"; else export TF_VAR_create_cluster="true"; fi
 
 # deploy.sh exports TF_VAR_name twice (log stack first, then main stack)
 if [ "${1:-main}" = log ]; then export TF_VAR_name=$LOG_BUCKET_STACK_NAME; else export TF_VAR_name=$MAIN_STACK_NAME; fi
