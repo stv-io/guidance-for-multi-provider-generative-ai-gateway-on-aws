@@ -327,6 +327,17 @@ async def get_chat_stream(
     # Extract upstream headers
     response_headers = dict(response.headers)
 
+    # An error (401/403/429/...) comes back as a JSON body, not an event stream: relay it
+    # with its status rather than an empty 200 stream
+    if response.status != 200:
+        error_body = await response.read()
+        await session.close()
+        return Response(
+            content=error_body,
+            status_code=response.status,
+            headers=relay_headers(response_headers),
+        )
+
     # Define an async generator that will yield SSE data from the response.
     async def stream_events():
         assistant_content_parts = []
@@ -504,7 +515,8 @@ async def proxy_request(request: Request):
                     json=data,
                 ) as resp:
                     response_headers = relay_headers(resp.headers)
-                    response_dict = await resp.json()
+                    response_status = resp.status
+                    response_dict = await resp.json(content_type=None)
 
             # If there's a response from the assistant, save it to history
             if response_dict.get("choices"):
@@ -519,8 +531,10 @@ async def proxy_request(request: Request):
             if session_id:
                 response_dict["session_id"] = session_id
 
+            # Keep LiteLLM's status: a 401/403/429 from key checks must not become a 200
             return Response(
                 content=json.dumps(response_dict),
+                status_code=response_status,
                 headers=response_headers,
                 media_type="application/json",
             )
