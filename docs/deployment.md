@@ -8,14 +8,16 @@ different environment profile. Diagrams are in [`docs/diagrams/`](diagrams/READM
 
 | Layer | Sandbox (`envs/sandbox.env`) | Production (`envs/production.env`) |
 |---|---|---|
-| Entry | CloudFront `*.cloudfront.net` | CloudFront on `RECORD_NAME.HOSTED_ZONE_NAME` (Route53 alias), ACM certificate in us-east-1 |
-| CloudFront → ALB | VPC origin to an **internal** ALB; traffic stays on the AWS network | same |
-| ALB | private subnets, SG admits only the CloudFront origin-facing prefix list, regional WAF, TLS 1.3 policy | same, plus the regional ACM certificate on :443 |
+| Entry | CloudFront on `https://llm.sandbox.myops-lab.cloud` (A + AAAA alias), edge WAF | CloudFront on `RECORD_NAME.HOSTED_ZONE_NAME`, edge WAF |
+| Certificates | requested and DNS-validated by the stack: us-east-1 (CloudFront) + eu-west-1 (ALB) | same, or bring your own ARNs |
+| CloudFront → ALB | VPC origin to an **internal** ALB over **HTTPS**; traffic stays on the AWS network | same |
+| ALB | private subnets, SG admits only the CloudFront origin-facing prefix list, TLS 1.3 policy, forwards only requests with the CloudFront secret header | same |
+| WAF | CLOUDFRONT-scope web ACL: AWS common rules, known bad inputs, IP reputation, 2,000 requests / 5 min per IP | same |
 | Compute | ECS Fargate ARM64, 1 task × 1 vCPU / 2 GB (autoscale 1–2) | 2–6 tasks × 2 vCPU / 4 GB |
-| App | LiteLLM v1.106.2 (:4000) and middleware (:3000), both in one task | same |
+| App | LiteLLM v1.106.2 pinned by digest and cosign-verified (:4000), middleware (:3000), both in one task | same |
 | Database | RDS PostgreSQL 18, `db.t4g.micro`, single-AZ | `db.t4g.medium`, Multi-AZ, 50 GB |
 | Cache | ElastiCache Valkey 9.1, 1 × `cache.t4g.micro` | 2 × `cache.t4g.small`, Multi-AZ with automatic failover |
-| Network | new VPC, 2 public + 2 private subnets, 1 NAT gateway, S3 gateway endpoint | same (one NAT: a single-AZ egress point; see below) |
+| Network | new VPC, 2 public + 2 private subnets, 1 NAT gateway, S3 gateway endpoint | same, with one NAT gateway per AZ (`NAT_GATEWAY_PER_AZ=true`) |
 | Models | Bedrock only (EU cross-region inference profiles), `INCLUDE_BASE_MODELS=false` | same; add providers by setting their API keys |
 | Estimated cost | ~$75–85/month before Bedrock tokens | dominated by Multi-AZ RDS, task count and NAT data |
 
@@ -51,19 +53,23 @@ Log in with user `admin` and the master key as the password.
 
 1. Create, or delegate, a public Route53 hosted zone in the production account, e.g.
    `genai.example.com`.
-2. Request two ACM certificates for `<record>.<zone>` (e.g. `api.genai.example.com`),
-   both DNS-validated in that zone:
-   - in **us-east-1**, for CloudFront → `CLOUDFRONT_CERTIFICATE_ARN`
-   - in the **stack region**, for the ALB → `CERTIFICATE_ARN`
+2. Certificates: leave `CERTIFICATE_ARN` and `CLOUDFRONT_CERTIFICATE_ARN` empty and the
+   stack requests both for `<record>.<zone>` and validates them through the zone. To
+   bring your own instead, set both: one in **us-east-1** for CloudFront and one in the
+   **stack region** for the ALB, covering the same name.
 3. Request Bedrock quota increases early; new accounts start low, and increases take days.
 4. Build `.env` and fill in the blanks:
    ```bash
    cat .env.template envs/production.env > .env
-   # HOSTED_ZONE_NAME, RECORD_NAME, CERTIFICATE_ARN, CLOUDFRONT_CERTIFICATE_ARN,
-   # TERRAFORM_S3_BUCKET_NAME
+   # HOSTED_ZONE_NAME, RECORD_NAME, TERRAFORM_S3_BUCKET_NAME
    AWS_PROFILE=<prod-profile> ./deploy.sh
    AWS_PROFILE=<prod-profile> ./validation/smoke.sh
    ```
+
+With a custom domain the CloudFront → ALB hop is HTTPS. CloudFront reaches the internal
+ALB through the VPC origin and forwards the `Host` header, so TLS is negotiated for
+`<record>.<zone>` against the ALB's regional certificate. The ALB needs no DNS record of
+its own.
 
 `STACK_ENV` prefixes the Terraform state keys (`<env>/terraform-unified.tfstate`),
 so the environments never share state even if they share a bucket.
@@ -73,6 +79,10 @@ so the environments never share state even if they share a bucket.
 | Variable | Default | Effect |
 |---|---|---|
 | `CLOUDFRONT_VPC_ORIGIN` | `true` | Internal ALB behind a CloudFront VPC origin. `false` restores the upstream design: public ALB, plain HTTP from CloudFront over the internet, guarded only by a secret header |
+| `USE_ROUTE53`, `HOSTED_ZONE_NAME`, `RECORD_NAME` | sandbox: `llm` in `sandbox.myops-lab.cloud` | Custom domain; also switches the CloudFront → ALB hop to HTTPS |
+| `CLOUDFRONT_WAF`, `CLOUDFRONT_WAF_RATE_LIMIT` | `true`, `2000` | Edge web ACL and its per-IP limit (requests per 5 minutes). Behind a VPC origin it replaces the regional ACL on the ALB |
+| `NAT_GATEWAY_PER_AZ` | `false` (production `true`) | One NAT gateway per AZ, about $35/month more per extra NAT plus data |
+| `LITELLM_VERSION`, `LITELLM_IMAGE_DIGEST` | `v1.106.2`, its index digest | The build refuses an image whose tag has moved or whose cosign signature fails against `config/litellm-cosign.pub`. Update both together |
 | `RDS_MULTI_AZ` | `true` (sandbox `false`) | RDS standby in a second AZ |
 | `REDIS_NUM_CACHE_CLUSTERS` | `2` (sandbox `1`) | >1 turns on Multi-AZ and automatic failover |
 | `INCLUDE_BASE_MODELS` | `true` (profiles `false`) | `false` loads only the region's Bedrock models, not the ~90 third-party entries in `default-config-base.yaml` |
@@ -117,12 +127,14 @@ AWS_PROFILE=sandbox ./undeploy.sh
 
 ## Known limits and before-production items
 
-- The module creates **one NAT gateway**, so Bedrock and other AWS API egress
-  depend on one AZ.
-- The CloudFront → ALB hop over the VPC origin is HTTP inside the AWS network.
-  End-to-end TLS needs an ALB certificate that matches the origin name. That is
-  not validated yet.
-- The regional WAF protects the ALB. CloudFront itself has no web ACL; that would
-  need a `CLOUDFRONT`-scope ACL in us-east-1.
+- The sandbox keeps **one NAT gateway** (single-AZ egress) to save cost; production
+  sets `NAT_GATEWAY_PER_AZ=true`.
+- Without a custom domain (plain `*.cloudfront.net`) the CloudFront → ALB hop stays
+  HTTP inside the AWS network, because there is no name to issue the ALB a certificate for.
+- Switching the origin protocol replaces the CloudFront VPC origin (CloudFront will not
+  update one in use). The new origin takes several minutes to deploy, and requests can
+  fail while the distribution moves over.
+- LiteLLM's Redis response cache is shared by all keys, and cached answers cost
+  nothing (decision D6).
 - See [`poc-success-criteria.md`](poc-success-criteria.md) for the PoC exit
   criteria and the items that block a customer pilot.
