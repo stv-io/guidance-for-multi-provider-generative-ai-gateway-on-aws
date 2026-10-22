@@ -38,9 +38,10 @@ invocation logging) if any of these hold:
 
 These block a customer pilot, not the internal PoC:
 
-- Only admins can create keys through `/key/generate`.
-- CloudFront reaches the ALB over a private, encrypted path, not plain HTTP on
-  the internet.
+- ~~Only admins can create keys through `/key/generate`.~~ Done: middleware gate, test K7.
+- ~~CloudFront reaches the ALB over a private path, not plain HTTP on the internet.~~
+  Done: VPC origin with an internal ALB (`CLOUDFRONT_VPC_ORIGIN=true`), test E1.
+  HTTPS on that hop (ALB certificate that matches the origin name) is still to validate.
 - The deployment runs in its own account, on its own domain, with ACM
   certificates in the stack region (ALB) and in us-east-1 (CloudFront).
 - Chat-history retention, data-processing terms and Bedrock invocation logging
