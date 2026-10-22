@@ -50,6 +50,7 @@ of a cent; `ALL_MODELS=1` costs a few cents.
 | **M4b** | Models | Bedrock-native streaming (LiteLLM pass-through) | `POST /bedrock/model/<id>/converse-stream` returns 200 with `contentBlockDelta` and `messageStop` events |
 | **M6** | Models | Large (gzip-compressed) responses survive the middleware relay | A ~250-word non-streaming answer returns 200 with > 1000 characters |
 | **M5** | Models | Every configured chat model answers (`ALL_MODELS=1` only) | Each chat model in `config/config.yaml` returns 200 |
+| **C1** | Cache | The response cache works and expires | `/cache/ping` reports the TTL from `LITELLM_CACHE_TTL_SECONDS`, and a repeated identical request returns `x-litellm-cache-key` with the same response id |
 | **H1** | History | Chat history persists in Postgres | Chat with `enable_history: true` returns a `session_id`; a follow-up with that `session_id` succeeds; `POST /chat-history` returns ≥ 4 messages |
 | **H2** | History | History is bound to its owner | `POST /chat-history` for that session using a *different* key returns 401 |
 | **K1** | Keys | Virtual keys can be issued | `POST /key/generate` (master key) with `models: [<default model>]` returns an `sk-` key |
@@ -58,7 +59,7 @@ of a cent; `ALL_MODELS=1` costs a few cents.
 | **K4** | Keys | Spend is tracked (Postgres write path) | `GET /key/info` for the K1 key shows `spend > 0` within 90 s |
 | **K5** | Keys | Rate limits are enforced (Valkey shared state) | A key with `rpm_limit: 1` gets 429 on its second request within the minute |
 | **K7** | Keys | Only admins can mint keys (middleware gate) | `POST /key/generate` with the non-admin K1 key returns 403 (runs before K6) |
-| **K6** | Keys | Revocation works | After `POST /key/delete`, the K1 key is rejected (401) |
+| **K6** | Keys | Revocation works on every task | After `POST /key/delete`, four requests in a row with the K1 key all get 401 within `user_api_key_cache_ttl` + 10 s (other tasks keep a cached copy of the key until that TTL) |
 | **X1** | Spend | The Bedrock budget sees all Bedrock spend | Budget `<stack>-bedrock-monthly` exists, excludes credits, and its service filter contains every service Cost Explorer billed for Bedrock in the last 60 days (Anthropic models bill as `Claude … (Amazon Bedrock Edition)`) |
 | **X2** | Spend | The near-real-time token alarm can reach someone | Alarm `<stack>-bedrock-tokens-per-hour` exists with an SNS action, and the email subscription is confirmed |
 | **S1** | Security | Secrets are not logged | The last 30 min of the LiteLLM and middleware CloudWatch log groups contain neither the master key nor the K1 key |

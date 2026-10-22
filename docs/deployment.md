@@ -38,7 +38,7 @@ cat .env.template envs/sandbox.env > .env     # later lines win
 # set TERRAFORM_S3_BUCKET_NAME in .env (globally unique; created if missing)
 rm -f config/config.yaml                      # regenerate from the model lists
 AWS_PROFILE=sandbox ./deploy.sh               # plans each stack, asks before applying
-AWS_PROFILE=sandbox ./validation/smoke.sh     # 35 end-to-end checks
+AWS_PROFILE=sandbox ./validation/smoke.sh     # 38 end-to-end checks
 ```
 
 `deploy.sh` writes each Terraform plan to a file, shows it, and applies that
@@ -141,7 +141,15 @@ AWS_PROFILE=sandbox ./undeploy.sh
   4. Delete the old origin (`<name>-alb`) in the CloudFront console, or with `aws cloudfront delete-vpc-origin`.
 
   Expect errors from the first apply until the distribution update completes; in the sandbox that took about 13 minutes.
-- LiteLLM's Redis response cache is shared by all keys, and cached answers cost
-  nothing (decision D6).
+- LiteLLM's Redis response cache is shared by all keys. An identical request (same model,
+  messages and parameters) is answered from cache at no cost for `LITELLM_CACHE_TTL_SECONDS`
+  (1 h). A client opts out per request with `"cache": {"no-cache": true}` (decision D6).
+- Revoking or changing a key takes effect on the other tasks within
+  `general_settings.user_api_key_cache_ttl` (10 s here; the upstream default is 60 s), because
+  LiteLLM evicts the cached key only on the task that handled the change.
+- Spend alarms (`ALARM_EMAIL`): an AWS Budgets budget on Bedrock cost, which excludes credits and
+  lags by hours, and a CloudWatch alarm on Bedrock tokens per hour, sent by email through SNS.
+  Both count all Bedrock use in the account and region, not only the gateway's. The SNS
+  subscription needs its confirmation email clicked once.
 - See [`poc-success-criteria.md`](poc-success-criteria.md) for the PoC exit
   criteria and the items that block a customer pilot.

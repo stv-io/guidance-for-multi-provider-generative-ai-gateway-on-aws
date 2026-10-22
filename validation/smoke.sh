@@ -255,6 +255,21 @@ if [ "${ALL_MODELS:-0}" = 1 ]; then
   [ -z "$bad" ] && pass "$n chat models answered" || fail "failing:$bad"
 else skip "set ALL_MODELS=1"; fi
 
+CURRENT=C1
+# Response cache: an identical request is answered from Valkey, and entries carry the TTL
+req GET "$BASE/cache/ping" "$MASTER_KEY"
+ttl=$(body | jq -r '.litellm_cache_params // "" | tostring | capture("ttl.{0,4}?(?<v>[0-9]+)").v // empty' 2>/dev/null)
+p="cache check $(date +%s)-$RANDOM: reply with one word"
+for i in 1 2; do
+  curl -sS -D "$TMP/ch$i" -o "$TMP/cb$i" -X POST "$BASE/v1/chat/completions" -H "Authorization: Bearer $MASTER_KEY" \
+    -H 'Content-Type: application/json' -d "$(chat_json "$OTHER_MODEL" "$p")" --max-time 60
+done
+hit=$(grep -i '^x-litellm-cache-key:' "$TMP/ch2" | head -1)
+same_id=$([ "$(jq -r .id "$TMP/cb1")" = "$(jq -r .id "$TMP/cb2")" ] && echo yes)
+want_ttl=${LITELLM_CACHE_TTL_SECONDS:-3600}
+if [ "$ttl" = "$want_ttl" ] && [ -n "$hit" ] && [ "$same_id" = yes ]; then pass "repeat served from cache, ttl=${ttl}s"
+else fail "ttl=${ttl:-none} (want $want_ttl) cache_hit=${hit:+yes} same_id=${same_id:-no}"; fi
+
 # ---------------------------------------------------------------- History
 echo "== History"
 CURRENT=H1
@@ -317,8 +332,15 @@ else skip "no K1 key"; fi
 CURRENT=K6
 if [ -n "$KEY" ]; then
   req POST "$BASE/key/delete" "$MASTER_KEY" "$(jq -nc --arg k "$KEY" '{keys:[$k]}')"; cdel=$CODE
-  sleep 2; req POST "$BASE/v1/chat/completions" "$KEY" "$(chat_json "$DEFAULT_MODEL")"
-  [ "$cdel" = 200 ] && [ "$CODE" = 401 ] && pass "deleted key -> 401" || fail "delete=$cdel then use=$CODE"
+  # Other tasks keep the key until general_settings.user_api_key_cache_ttl expires, so poll: revoked
+  # means 4 requests in a row (spread across tasks by the ALB) all get 401, within the TTL + 10 s
+  limit=$(( $(yq -r '.general_settings.user_api_key_cache_ttl // 60' config/config.yaml) + 10 )); t0=$(date +%s); revoked=""
+  while [ $(( $(date +%s) - t0 )) -le "$limit" ]; do
+    codes=""; for _ in 1 2 3 4; do req GET "$BASE/v1/models" "$KEY"; codes="$codes$CODE "; done
+    [ "$codes" = "401 401 401 401 " ] && { revoked=$(( $(date +%s) - t0 )); break; }; sleep 2
+  done
+  [ "$cdel" = 200 ] && [ -n "$revoked" ] && pass "deleted key -> 401 on every task within ${revoked}s" \
+    || fail "delete=$cdel; still accepted ${limit}s later ($codes)"
 else skip "no K1 key"; fi
 
 # ---------------------------------------------------------------- Security

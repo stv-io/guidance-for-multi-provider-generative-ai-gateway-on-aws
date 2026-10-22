@@ -404,6 +404,13 @@ environment_variables:
   # DEBUG logs request bodies, i.e. prompts
   LITELLM_LOG: "INFO"
 
+general_settings:
+  # Seconds a worker caches a virtual key's record. /key/delete and /key/update only evict it from
+  # the worker that handled the call, so with several tasks a revoked key keeps working on the
+  # others until this expires (upstream default 60). 10 s bounds revocation at the cost of more
+  # key lookups.
+  user_api_key_cache_ttl: 10
+
 litellm_settings:
   # Response cache shared by all keys: an identical request (model, messages, parameters) is
   # answered from Valkey without calling the model, and costs nothing. A client can bypass it per
