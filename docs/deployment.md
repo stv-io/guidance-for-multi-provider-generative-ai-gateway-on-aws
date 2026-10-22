@@ -131,9 +131,16 @@ AWS_PROFILE=sandbox ./undeploy.sh
   sets `NAT_GATEWAY_PER_AZ=true`.
 - Without a custom domain (plain `*.cloudfront.net`) the CloudFront → ALB hop stays
   HTTP inside the AWS network, because there is no name to issue the ALB a certificate for.
-- Switching the origin protocol replaces the CloudFront VPC origin (CloudFront will not
-  update one in use). The new origin takes several minutes to deploy, and requests can
-  fail while the distribution moves over.
+- Adding a custom domain to an existing deployment switches the CloudFront VPC origin
+  from HTTP to HTTPS. CloudFront won't update or delete an origin while a distribution
+  uses it, and Terraform tries to delete the old origin before the distribution moves
+  off it. On a fresh deploy none of this applies. For a switch on a live stack:
+  1. Apply. The new `https-only` origin is created, then the apply fails deleting the old one.
+  2. `terraform state rm 'module.ecs_cluster.aws_cloudfront_vpc_origin.alb["http-only"]'`
+  3. Plan and apply again. This moves the distribution to the new origin.
+  4. Delete the old origin (`<name>-alb`) in the CloudFront console, or with `aws cloudfront delete-vpc-origin`.
+
+  Expect errors from the first apply until the distribution update completes; in the sandbox that took about 13 minutes.
 - LiteLLM's Redis response cache is shared by all keys, and cached answers cost
   nothing (decision D6).
 - See [`poc-success-criteria.md`](poc-success-criteria.md) for the PoC exit
