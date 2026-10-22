@@ -23,6 +23,7 @@ from sqlalchemy import (
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql import select, insert, update
 import hashlib
+import hmac
 from okta_jwt_verifier import AccessTokenVerifier
 from okta_jwt_verifier.jwt_utils import JWTUtils
 from fastapi.middleware.cors import CORSMiddleware
@@ -1117,10 +1118,47 @@ async def list_session_ids_for_api_key(request: Request):
     return {"session_ids": session_ids}
 
 
-# ToDo: Enforce that a non-admin user can only create keys for themself if this bug isn't fixed in a timely manner https://github.com/BerriAI/litellm/issues/7336
+async def caller_is_proxy_admin(client: httpx.AsyncClient, token: str) -> bool:
+    """True for the master key, or a key whose LiteLLM user has the proxy_admin role."""
+    if MASTER_KEY and hmac.compare_digest(token, MASTER_KEY):
+        return True
+    # /key/info without a key parameter describes the calling key
+    key_info = await client.get(
+        f"{LITELLM_ENDPOINT}/key/info",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=10.0,
+    )
+    if key_info.status_code != 200:
+        return False
+    user_id = (key_info.json().get("info") or {}).get("user_id")
+    if not user_id or not MASTER_KEY:
+        return False
+    user_info = await client.get(
+        f"{LITELLM_ENDPOINT}/user/info",
+        params={"user_id": user_id},
+        headers={"Authorization": f"Bearer {MASTER_KEY}"},
+        timeout=10.0,
+    )
+    if user_info.status_code != 200:
+        return False
+    return (user_info.json().get("user_info") or {}).get("user_role") == "proxy_admin"
+
+
+# LiteLLM lets non-admin keys create keys for any user (https://github.com/BerriAI/litellm/issues/7336),
+# so key creation through the gateway is limited to admins. Non-admin users get their key via /user/new.
 @app.post("/key/generate")
 async def forward_key_generate(request: Request):
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401, detail={"error": "Missing or invalid Authorization header"}
+        )
     async with httpx.AsyncClient() as client:
+        if not await caller_is_proxy_admin(client, auth_header[len("Bearer ") :]):
+            return JSONResponse(
+                status_code=403,
+                content={"error": "Only admins can generate keys"},
+            )
         response = await client.post(
             f"{LITELLM_ENDPOINT}/key/generate",
             content=await request.body(),

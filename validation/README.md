@@ -50,6 +50,7 @@ of a cent; `ALL_MODELS=1` costs a few cents.
 | **K3** | Keys | Model restrictions are enforced | The K1 key on a model outside its list is rejected (401/403) |
 | **K4** | Keys | Spend is tracked (Postgres write path) | `GET /key/info` for the K1 key shows `spend > 0` within 90 s |
 | **K5** | Keys | Rate limits are enforced (Valkey shared state) | A key with `rpm_limit: 1` gets 429 on its second request within the minute |
+| **K7** | Keys | Only admins can mint keys (middleware gate) | `POST /key/generate` with the non-admin K1 key returns 403 (runs before K6) |
 | **K6** | Keys | Revocation works | After `POST /key/delete`, the K1 key is rejected (401) |
 | **S1** | Security | Secrets are not logged | The last 30 min of the LiteLLM and middleware CloudWatch log groups contain neither the master key nor the K1 key |
 

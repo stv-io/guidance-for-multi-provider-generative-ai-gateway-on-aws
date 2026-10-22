@@ -238,6 +238,11 @@ if [ -n "$RKEY" ]; then
   [ "$c1" = 200 ] && [ "$c2" = 429 ] && pass "1st=200 2nd=429" || fail "1st=$c1 2nd=$c2"
 else fail "could not create rpm-limited key"; fi
 
+CURRENT=K7
+if [ -n "$KEY" ]; then req POST "$BASE/key/generate" "$KEY" '{"models":[]}'
+  [ "$CODE" = 403 ] && pass "non-admin key cannot mint keys -> 403" || fail "non-admin /key/generate -> $CODE $(body | head -c 200)"
+else skip "no K1 key"; fi
+
 CURRENT=K6
 if [ -n "$KEY" ]; then
   req POST "$BASE/key/delete" "$MASTER_KEY" "$(jq -nc --arg k "$KEY" '{keys:[$k]}')"; cdel=$CODE
