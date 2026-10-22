@@ -36,7 +36,7 @@ output "eks_cluster_name" {
 
 output "eks_deployment_name" {
   description = "Name of the Kubernetes deployment"
-  value       = kubernetes_deployment.litellm.metadata[0].name
+  value       = kubernetes_deployment_v1.litellm.metadata[0].name
 }
 
 output "public_subnet_ids" {
