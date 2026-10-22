@@ -6,22 +6,25 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.0"
     }
-    # helm 3.x and kubernetes 3.x change block syntax / drop resources used by modules/eks
     helm = {
       source  = "hashicorp/helm"
-      version = "~> 2.0"
+      version = "~> 3.3"
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = "~> 2.20"
+      version = "~> 3.4"
     }
     random = {
       source  = "hashicorp/random"
-      version = "~> 3.6"
+      version = "~> 3.9"
     }
     tls = {
       source  = "hashicorp/tls"
-      version = "~> 4.0"
+      version = "~> 4.4"
+    }
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.14"
     }
   }
 }
@@ -74,7 +77,7 @@ provider "kubernetes" {
 }
 
 provider "helm" {
-  kubernetes {
+  kubernetes = {
     host                   = local.platform == "EKS" ? module.eks_cluster[0].cluster_endpoint : ""
     cluster_ca_certificate = local.platform == "EKS" ? base64decode(module.eks_cluster[0].cluster_ca) : ""
     token = local.platform == "EKS" ? data.aws_eks_cluster_auth.cluster[0].token : ""

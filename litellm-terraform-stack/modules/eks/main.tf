@@ -19,7 +19,7 @@ resource "time_sleep" "wait_for_rbac_propagation_before_creating_secrets" {
   create_duration = "5s"
 }
 
-resource "kubernetes_secret" "litellm_api_keys" {
+resource "kubernetes_secret_v1" "litellm_api_keys" {
   metadata {
     name = "litellm-api-keys"
   }
@@ -59,7 +59,7 @@ resource "kubernetes_secret" "litellm_api_keys" {
   ]
 }
 
-resource "kubernetes_secret" "middleware_secrets" {
+resource "kubernetes_secret_v1" "middleware_secrets" {
   metadata {
     name = "middleware-secrets"
   }
@@ -77,7 +77,7 @@ resource "kubernetes_secret" "middleware_secrets" {
 }
 
 # Deployment
-resource "kubernetes_deployment" "litellm" {
+resource "kubernetes_deployment_v1" "litellm" {
   metadata {
     name = "litellm-deployment"
   }
@@ -193,7 +193,7 @@ resource "kubernetes_deployment" "litellm" {
 
           env_from {
             secret_ref {
-              name = kubernetes_secret.litellm_api_keys.metadata[0].name
+              name = kubernetes_secret_v1.litellm_api_keys.metadata[0].name
             }
           }
 
@@ -246,7 +246,7 @@ resource "kubernetes_deployment" "litellm" {
 
           env_from {
             secret_ref {
-              name = kubernetes_secret.middleware_secrets.metadata[0].name
+              name = kubernetes_secret_v1.middleware_secrets.metadata[0].name
             }
           }
 
@@ -285,7 +285,7 @@ resource "kubernetes_ingress_v1" "litellm" {
       "alb.ingress.kubernetes.io/target-type"      = "ip"
       "alb.ingress.kubernetes.io/listen-ports"     = jsonencode([{"HTTP" = 80}, {"HTTPS" = 443}])
       "alb.ingress.kubernetes.io/certificate-arn"  = var.certificate_arn
-      "alb.ingress.kubernetes.io/ssl-policy"       = "ELBSecurityPolicy-2016-08"
+      "alb.ingress.kubernetes.io/ssl-policy"       = "ELBSecurityPolicy-TLS13-1-2-Res-PQ-2025-09"
       "alb.ingress.kubernetes.io/wafv2-acl-arn"   = var.wafv2_acl_arn
     }
   }
@@ -299,7 +299,7 @@ resource "kubernetes_ingress_v1" "litellm" {
           path_type = "Prefix"
           backend {
             service {
-              name = kubernetes_service.litellm.metadata[0].name
+              name = kubernetes_service_v1.litellm.metadata[0].name
               port {
                 name = "port3000"
               }
@@ -312,7 +312,7 @@ resource "kubernetes_ingress_v1" "litellm" {
           path_type = "Prefix"
           backend {
             service {
-              name = kubernetes_service.litellm.metadata[0].name
+              name = kubernetes_service_v1.litellm.metadata[0].name
               port {
                 name = "port3000"
               }
@@ -325,7 +325,7 @@ resource "kubernetes_ingress_v1" "litellm" {
           path_type = "Prefix"
           backend {
             service {
-              name = kubernetes_service.litellm.metadata[0].name
+              name = kubernetes_service_v1.litellm.metadata[0].name
               port {
                 name = "port3000"
               }
@@ -338,7 +338,7 @@ resource "kubernetes_ingress_v1" "litellm" {
           path_type = "Prefix"
           backend {
             service {
-              name = kubernetes_service.litellm.metadata[0].name
+              name = kubernetes_service_v1.litellm.metadata[0].name
               port {
                 name = "port3000"
               }
@@ -351,7 +351,7 @@ resource "kubernetes_ingress_v1" "litellm" {
           path_type = "Prefix"
           backend {
             service {
-              name = kubernetes_service.litellm.metadata[0].name
+              name = kubernetes_service_v1.litellm.metadata[0].name
               port {
                 name = "port3000"
               }
@@ -364,7 +364,7 @@ resource "kubernetes_ingress_v1" "litellm" {
           path_type = "Prefix"
           backend {
             service {
-              name = kubernetes_service.litellm.metadata[0].name
+              name = kubernetes_service_v1.litellm.metadata[0].name
               port {
                 name = "port3000"
               }
@@ -377,7 +377,7 @@ resource "kubernetes_ingress_v1" "litellm" {
           path_type = "Prefix"
           backend {
             service {
-              name = kubernetes_service.litellm.metadata[0].name
+              name = kubernetes_service_v1.litellm.metadata[0].name
               port {
                 name = "port3000"
               }
@@ -390,7 +390,7 @@ resource "kubernetes_ingress_v1" "litellm" {
           path_type = "Prefix"
           backend {
             service {
-              name = kubernetes_service.litellm.metadata[0].name
+              name = kubernetes_service_v1.litellm.metadata[0].name
               port {
                 name = "port3000"
               }
@@ -403,7 +403,7 @@ resource "kubernetes_ingress_v1" "litellm" {
           path_type = "Prefix"
           backend {
             service {
-              name = kubernetes_service.litellm.metadata[0].name
+              name = kubernetes_service_v1.litellm.metadata[0].name
               port {
                 name = "port3000"
               }
@@ -416,7 +416,7 @@ resource "kubernetes_ingress_v1" "litellm" {
           path_type = "Prefix"
           backend {
             service {
-              name = kubernetes_service.litellm.metadata[0].name
+              name = kubernetes_service_v1.litellm.metadata[0].name
               port {
                 name = "port4000"
               }
@@ -430,7 +430,7 @@ resource "kubernetes_ingress_v1" "litellm" {
 }
 
 # Service
-resource "kubernetes_service" "litellm" {
+resource "kubernetes_service_v1" "litellm" {
   metadata {
     name = "litellm-service"
   }
@@ -466,10 +466,11 @@ resource "kubernetes_service" "litellm" {
 
 # Add AWS Load Balancer Controller
 module "aws_load_balancer_controller_irsa_role" {
-  source = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "5.52.2"
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts"
+  version = "6.8.2"
 
-  role_name                              = "${var.name}-aws-load-balancer-controller"
+  name                                   = "${var.name}-aws-load-balancer-controller"
+  use_name_prefix                        = false
   attach_load_balancer_controller_policy = true
 
   oidc_providers = {
@@ -485,61 +486,55 @@ resource "helm_release" "aws_load_balancer_controller" {
   repository = "https://aws.github.io/eks-charts"
   chart      = "aws-load-balancer-controller"
   namespace  = "kube-system"
-  version    = "1.11.0"
+  version    = "3.6.1"
 
-  set {
-    name  = "clusterName"
-    value = local.cluster_name
-  }
-
-  set {
-    name  = "serviceAccount.create"
-    value = "true"
-  }
-
-  set {
-    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-    value = module.aws_load_balancer_controller_irsa_role.iam_role_arn
-  }
-
-  set {
-    name  = "podSecurityContext.runAsNonRoot"
-    value = "true"
-  }
-
-  set {
-    name  = "podSecurityContext.runAsUser"
-    value = "1000"
-  }
-
-  set {
-    name  = "podSecurityContext.runAsGroup"
-    value = "1000"
-  }
-
-  //Only need to set to internal ECR repo when internet access not available
-  dynamic "set" {
-    for_each = var.disable_outbound_network_access ? [1] : []
-    content {
-      name  = "image.repository"
-      value = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.region}.amazonaws.com/${var.eks_alb_controller_private_ecr_repository_name}/eks/aws-load-balancer-controller"
-    }
-  }
-
-  set {
-    name  = "enableShield"
-    value = "false"
-  }
-
-  set {
-    name  = "enableWaf"
-    value = "false"
-  }
-
-  set {
-    name  = "enableWafv2"
-    value = "true"
-  }
+  set = concat(
+    [
+      {
+        name  = "clusterName"
+        value = local.cluster_name
+      },
+      {
+        name  = "serviceAccount.create"
+        value = "true"
+      },
+      {
+        name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+        value = module.aws_load_balancer_controller_irsa_role.arn
+      },
+      {
+        name  = "podSecurityContext.runAsNonRoot"
+        value = "true"
+      },
+      {
+        name  = "podSecurityContext.runAsUser"
+        value = "1000"
+      },
+      {
+        name  = "podSecurityContext.runAsGroup"
+        value = "1000"
+      },
+      {
+        name  = "enableShield"
+        value = "false"
+      },
+      {
+        name  = "enableWaf"
+        value = "false"
+      },
+      {
+        name  = "enableWafv2"
+        value = "true"
+      },
+    ],
+    //Only need to set to internal ECR repo when internet access not available
+    var.disable_outbound_network_access ? [
+      {
+        name  = "image.repository"
+        value = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.region}.amazonaws.com/${var.eks_alb_controller_private_ecr_repository_name}/eks/aws-load-balancer-controller"
+      },
+    ] : [],
+  )
 
   depends_on = [
     aws_eks_node_group.core_nodegroup,
