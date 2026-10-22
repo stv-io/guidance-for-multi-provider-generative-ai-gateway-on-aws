@@ -36,7 +36,7 @@ cat .env.template envs/sandbox.env > .env     # later lines win
 # set TERRAFORM_S3_BUCKET_NAME in .env (globally unique; created if missing)
 rm -f config/config.yaml                      # regenerate from the model lists
 AWS_PROFILE=sandbox ./deploy.sh               # plans each stack, asks before applying
-AWS_PROFILE=sandbox ./validation/smoke.sh     # 30 end-to-end checks
+AWS_PROFILE=sandbox ./validation/smoke.sh     # 35 end-to-end checks
 ```
 
 `deploy.sh` writes each Terraform plan to a file, shows it, and applies that

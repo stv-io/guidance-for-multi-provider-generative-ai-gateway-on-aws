@@ -79,8 +79,30 @@ esac
 
 echo $DOCKER_ARCH
 
+# LITELLM_IMAGE_DIGEST pins the upstream image. Refuse to build if the tag no longer points at
+# that digest, or if the image is not signed with LiteLLM's published cosign key.
+LITELLM_DIGEST_ARG=""
+if [ -n "${LITELLM_IMAGE_DIGEST:-}" ] && [ "$BUILD_FROM_SOURCE" != "true" ]; then
+    UPSTREAM="ghcr.io/berriai/litellm"
+    TAG_DIGEST=$(docker buildx imagetools inspect "$UPSTREAM:$LITELLM_VERSION" | awk '/^Digest:/ {print $2; exit}')
+    if [ "$TAG_DIGEST" != "$LITELLM_IMAGE_DIGEST" ]; then
+        echo "Error: $UPSTREAM:$LITELLM_VERSION resolves to $TAG_DIGEST, not the pinned LITELLM_IMAGE_DIGEST $LITELLM_IMAGE_DIGEST"
+        exit 1
+    fi
+    if command -v cosign >/dev/null; then
+        cosign verify --key config/litellm-cosign.pub "$UPSTREAM@$LITELLM_IMAGE_DIGEST" >/dev/null || {
+            echo "Error: cosign signature check failed for $UPSTREAM@$LITELLM_IMAGE_DIGEST"
+            exit 1
+        }
+        echo "Verified cosign signature for $UPSTREAM@$LITELLM_IMAGE_DIGEST"
+    else
+        echo "Warning: cosign not installed; skipping the signature check of $UPSTREAM@$LITELLM_IMAGE_DIGEST"
+    fi
+    LITELLM_DIGEST_ARG="@$LITELLM_IMAGE_DIGEST"
+fi
+
 aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-docker build --platform $DOCKER_ARCH --build-arg LITELLM_VERSION=${LITELLM_VERSION} -t $APP_NAME\:${LITELLM_VERSION} .
+docker build --platform $DOCKER_ARCH --build-arg LITELLM_VERSION=${LITELLM_VERSION} --build-arg LITELLM_DIGEST=${LITELLM_DIGEST_ARG} -t $APP_NAME\:${LITELLM_VERSION} .
 echo "Tagging image with ${APP_NAME}:${LITELLM_VERSION}"
 docker tag $APP_NAME\:${LITELLM_VERSION} $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$APP_NAME\:${LITELLM_VERSION}
 docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$APP_NAME\:${LITELLM_VERSION}

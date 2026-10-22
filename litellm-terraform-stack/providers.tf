@@ -43,6 +43,15 @@ provider "aws" {
   }
 }
 
+# CloudFront only accepts certificates and web ACLs from us-east-1
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+  default_tags {
+    tags = local.common_labels
+  }
+}
+
 # AppRegistry closed to new customers on 2026-07-30 (CreateApplication returns AccessDenied),
 # so it is opt-in for accounts that already use it.
 resource "aws_servicecatalogappregistry_application" "solution_application" {

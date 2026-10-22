@@ -76,3 +76,15 @@ variable "use_route53" {
   type        = bool
   default     = false
 }
+
+variable "create_regional_waf" {
+  description = "Create the REGIONAL web ACL for the ALB (not needed when an edge ACL covers all traffic)"
+  type        = bool
+  default     = true
+}
+
+variable "nat_gateway_per_az" {
+  description = "One NAT gateway per AZ instead of a single shared one"
+  type        = bool
+  default     = false
+}

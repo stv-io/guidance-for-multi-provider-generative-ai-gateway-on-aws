@@ -249,15 +249,13 @@ resource "aws_ecs_service" "litellm_service" {
   deployment_controller {
     type = "ECS"
   }
+  # Autoscaling owns the task count after creation; without this every apply resets it
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
+
   depends_on = [
-    aws_lb_listener_rule.openai_completions,
-    aws_lb_listener_rule.chat_completions,
-    aws_lb_listener_rule.chat_history,
-    aws_lb_listener_rule.bedrock_chat_history,
-    aws_lb_listener_rule.bedrock_liveliness,
-    aws_lb_listener_rule.session_ids,
-    aws_lb_listener_rule.key_generate,
-    aws_lb_listener_rule.user_new,
-    aws_lb_listener_rule.catch_all
+    aws_lb_listener_rule.middleware,
+    aws_lb_listener_rule.cloudfront_to_litellm,
   ]
 }

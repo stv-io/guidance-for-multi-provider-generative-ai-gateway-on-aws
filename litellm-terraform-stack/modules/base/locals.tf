@@ -1,7 +1,8 @@
 # The NAT gateway count replicates:
 #   natGatewayCount = props.disableOutboundNetworkAccess ? 0 : 1
 locals {
-  nat_gateway_count = var.disable_outbound_network_access ? 0 : 1
+  # 2 = one per AZ of the new VPC's two AZs
+  nat_gateway_count = var.disable_outbound_network_access ? 0 : (var.nat_gateway_per_az ? 2 : 1)
 
   # We'll create private subnets that route to NAT if NAT is 1, or are isolated if NAT is 0.
   # This helps replicate the concept:
@@ -110,8 +111,8 @@ data "aws_route_tables" "existing_vpc_all" {
 locals {
   # If we’re using an existing VPC, fetch ALL route table IDs.
   # Otherwise, just pick the new route tables from our resources.
-  s3_gateway_route_table_ids = local.creating_new_vpc ? [aws_route_table.public[0].id, local.private_route_table.id] : data.aws_route_tables.existing_vpc_all[0].ids
-  private_route_table = local.creating_new_vpc ? (local.nat_gateway_count == 1 ? aws_route_table.private_with_nat[0] : aws_route_table.private_isolated[0]) : (null)
+  s3_gateway_route_table_ids = local.creating_new_vpc ? concat([aws_route_table.public[0].id], local.private_route_table_ids) : data.aws_route_tables.existing_vpc_all[0].ids
+  private_route_table_ids = local.creating_new_vpc ? (local.nat_gateway_count >= 1 ? aws_route_table.private_with_nat[*].id : aws_route_table.private_isolated[*].id) : []
 
 }
 

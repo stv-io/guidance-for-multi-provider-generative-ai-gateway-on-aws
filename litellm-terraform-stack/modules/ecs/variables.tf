@@ -359,7 +359,25 @@ variable "cloudfront_vpc_origin" {
 }
 
 variable "cloudfront_certificate_arn" {
-  description = "ACM certificate in us-east-1 for the CloudFront custom domain. Falls back to certificate_arn when empty (only valid if the stack is in us-east-1)"
+  description = "ACM certificate in us-east-1 for the CloudFront custom domain. When empty: created by the stack if certificate_arn is also empty, otherwise falls back to certificate_arn (only valid if the stack is in us-east-1)"
   type        = string
   default     = ""
+}
+
+variable "cloudfront_waf" {
+  description = "Attach a CLOUDFRONT-scope web ACL (created in us-east-1) to the distribution"
+  type        = bool
+  default     = true
+}
+
+variable "cloudfront_waf_rate_limit" {
+  description = "Requests per 5 minutes from one IP before the edge WAF blocks it"
+  type        = number
+  default     = 2000
+}
+
+variable "regional_waf" {
+  description = "Associate the regional web ACL (wafv2_acl_arn) with the ALB"
+  type        = bool
+  default     = true
 }

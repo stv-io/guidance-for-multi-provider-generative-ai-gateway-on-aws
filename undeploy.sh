@@ -194,6 +194,11 @@ export TF_VAR_langfuse_secret_key=$LANGFUSE_SECRET_KEY
 export TF_VAR_use_route53=$USE_ROUTE53
 export TF_VAR_use_cloudfront=$USE_CLOUDFRONT
 export TF_VAR_cloudfront_price_class=$CLOUDFRONT_PRICE_CLASS
+export TF_VAR_cloudfront_vpc_origin=${CLOUDFRONT_VPC_ORIGIN:-true}
+export TF_VAR_cloudfront_certificate_arn=${CLOUDFRONT_CERTIFICATE_ARN:-}
+export TF_VAR_cloudfront_waf=${CLOUDFRONT_WAF:-true}
+export TF_VAR_cloudfront_waf_rate_limit=${CLOUDFRONT_WAF_RATE_LIMIT:-2000}
+export TF_VAR_nat_gateway_per_az=${NAT_GATEWAY_PER_AZ:-false}
 
 if [ -n "${LANGFUSE_HOST}" ]; then
     export TF_VAR_langfuse_host=$LANGFUSE_HOST

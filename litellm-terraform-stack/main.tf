@@ -33,10 +33,23 @@ module "base" {
   redis_node_type = var.redis_node_type
   redis_num_cache_clusters = var.redis_num_cache_clusters
   use_route53 = var.use_route53
+  create_regional_waf = local.regional_waf
+  nat_gateway_per_az = var.nat_gateway_per_az
+}
+
+locals {
+  cloudfront_waf = var.use_cloudfront && var.cloudfront_waf
+  # Behind a VPC origin every request has already passed the edge ACL, so a second, regional ACL
+  # on the ALB would only add cost
+  regional_waf = !(local.cloudfront_waf && var.cloudfront_vpc_origin)
 }
 
 module "ecs_cluster" {
   source = "./modules/ecs"
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
   name = var.name
   config_bucket_arn = module.base.ConfigBucketArn
   redis_host = module.base.RedisHost
@@ -52,6 +65,9 @@ module "ecs_cluster" {
   cloudfront_price_class = var.cloudfront_price_class
   cloudfront_vpc_origin = var.cloudfront_vpc_origin
   cloudfront_certificate_arn = var.cloudfront_certificate_arn
+  cloudfront_waf = local.cloudfront_waf
+  cloudfront_waf_rate_limit = var.cloudfront_waf_rate_limit
+  regional_waf = local.regional_waf
   openai_api_key = var.openai_api_key
   azure_openai_api_key = var.azure_openai_api_key
   azure_api_key = var.azure_api_key
@@ -103,7 +119,9 @@ module "ecs_cluster" {
   langfuse_secret_key = var.langfuse_secret_key
   langfuse_host = var.langfuse_host
 
-  depends_on = [ module.base ]
+  # No module-level depends_on on module.base: the outputs above already order the resources, and
+  # depends_on would defer every data source in this module to apply time whenever module.base has
+  # any pending change, which shows every IAM policy and the task definition as changed
 }
 
 # The EKS path was removed; the ECS module no longer needs a count.

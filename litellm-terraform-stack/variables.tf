@@ -335,9 +335,27 @@ variable "cloudfront_vpc_origin" {
 }
 
 variable "cloudfront_certificate_arn" {
-  description = "ACM certificate in us-east-1 for the CloudFront custom domain. Falls back to certificate_arn when empty (only valid if the stack is in us-east-1)"
+  description = "ACM certificate in us-east-1 for the CloudFront custom domain. When empty: created by the stack if certificate_arn is also empty, otherwise falls back to certificate_arn (only valid if the stack is in us-east-1)"
   type        = string
   default     = ""
+}
+
+variable "cloudfront_waf" {
+  description = "Attach a CLOUDFRONT-scope web ACL to the distribution. Behind a VPC origin it replaces the regional ACL on the ALB"
+  type        = bool
+  default     = true
+}
+
+variable "cloudfront_waf_rate_limit" {
+  description = "Requests per 5 minutes from one IP before the edge WAF blocks it"
+  type        = number
+  default     = 2000
+}
+
+variable "nat_gateway_per_az" {
+  description = "One NAT gateway per AZ (each private subnet egresses through its own AZ) instead of a single shared one"
+  type        = bool
+  default     = false
 }
 
 variable "create_appregistry_application" {

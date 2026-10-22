@@ -391,6 +391,9 @@ export TF_VAR_use_cloudfront=$USE_CLOUDFRONT
 export TF_VAR_cloudfront_price_class=$CLOUDFRONT_PRICE_CLASS
 export TF_VAR_cloudfront_vpc_origin=${CLOUDFRONT_VPC_ORIGIN:-true}
 export TF_VAR_cloudfront_certificate_arn=${CLOUDFRONT_CERTIFICATE_ARN:-}
+export TF_VAR_cloudfront_waf=${CLOUDFRONT_WAF:-true}
+export TF_VAR_cloudfront_waf_rate_limit=${CLOUDFRONT_WAF_RATE_LIMIT:-2000}
+export TF_VAR_nat_gateway_per_az=${NAT_GATEWAY_PER_AZ:-false}
 
 # Display CloudFront and Route53 configuration
 echo "USE_ROUTE53: $USE_ROUTE53"

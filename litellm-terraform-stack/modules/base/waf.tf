@@ -2,6 +2,7 @@
 # WAFv2 Web ACL
 ###############################################################################
 resource "aws_wafv2_web_acl" "litellm_waf" {
+  count       = var.create_regional_waf ? 1 : 0
   name        = "LiteLLMWAF"
   description = "WAF for LiteLLM"
   scope       = "REGIONAL" # or CLOUDFRONT
@@ -78,4 +79,9 @@ resource "aws_wafv2_web_acl" "litellm_waf" {
     }
   }
 
+}
+
+moved {
+  from = aws_wafv2_web_acl.litellm_waf
+  to   = aws_wafv2_web_acl.litellm_waf[0]
 }

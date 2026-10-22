@@ -13,7 +13,7 @@ RESULTS_FILE="$RESULTS_DIR/$(date -u +%Y%m%dT%H%M%SZ).json"
 TMP=$(mktemp -d)
 trap cleanup EXIT
 
-for bin in aws terraform curl jq yq; do
+for bin in aws terraform curl jq yq dig; do
   command -v "$bin" >/dev/null || { echo "missing dependency: $bin"; exit 2; }
 done
 
@@ -60,7 +60,8 @@ echo "== Discovering deployment"
 tfout() { terraform -chdir="$MAIN_TF" output -raw "$1" 2>/dev/null; }
 BASE=$(tfout ServiceURL); ALB=$(tfout alb_dns_name); VPC_ID=$(tfout vpc_id)
 CLUSTER=$(tfout LitellmEcsCluster); SERVICE=$(tfout LitellmEcsTask)
-CF_DOMAIN=$(tfout cloudfront_domain_name)
+CF_DOMAIN=$(tfout cloudfront_domain_name); CF_ID=$(tfout cloudfront_distribution_id)
+FQDN=""; [ "${USE_ROUTE53:-false}" = true ] && [ -n "${RECORD_NAME:-}" ] && FQDN="$RECORD_NAME.$HOSTED_ZONE_NAME"
 [ -n "$BASE" ] || { echo "could not read terraform outputs (run deploy.sh first)"; exit 2; }
 SECRET_ARN=$(aws secretsmanager list-secrets --filters Key=name,Values=LiteLLMMasterSalt- --query 'SecretList[0].ARN' --output text)
 MASTER_KEY=$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --query SecretString --output text | jq -r .LITELLM_MASTER_KEY)
@@ -116,6 +117,24 @@ if [ "${DISABLE_OUTBOUND_NETWORK_ACCESS}" = true ]; then skip "outbound disabled
 elif [ "$n_if" -eq 0 ] && [ "$n_s3" -eq 1 ]; then pass "0 interface endpoints, S3 gateway present"
 else fail "interface=$n_if s3_gateway=$n_s3"; fi
 
+CURRENT=I6
+nats=$(aws ec2 describe-nat-gateways --filter Name=vpc-id,Values="$VPC_ID" Name=state,Values=available \
+  --query 'NatGateways[].SubnetId' --output json 2>/dev/null)
+n_nat=$(jq length <<<"$nats")
+nat_azs=$(aws ec2 describe-subnets --subnet-ids $(jq -r '.[]' <<<"$nats") --query 'Subnets[].AvailabilityZone' --output text 2>/dev/null | tr '\t' '\n' | sort -u | wc -l | tr -d ' ')
+want_nat=$([ "${NAT_GATEWAY_PER_AZ:-false}" = true ] && echo 2 || echo 1)
+if [ "${DISABLE_OUTBOUND_NETWORK_ACCESS}" = true ]; then skip "outbound disabled: no NAT expected"
+elif [ "$n_nat" = "$want_nat" ] && [ "$nat_azs" = "$want_nat" ]; then pass "$n_nat NAT gateway(s) in $nat_azs AZ(s) (NAT_GATEWAY_PER_AZ=${NAT_GATEWAY_PER_AZ:-false})"
+else fail "NAT gateways=$n_nat in $nat_azs AZs, want $want_nat"; fi
+
+CURRENT=I7
+# The proxy reports its version in the OpenAPI document (absent when DISABLE_SWAGGER_PAGE=true)
+req GET "$BASE/openapi.json" "$MASTER_KEY"
+running=$(body | jq -r '.info.version // empty' 2>/dev/null)
+if [ "$CODE" = 404 ]; then skip "OpenAPI document disabled"
+elif [ "$CODE" = 200 ] && [ "v$running" = "$LITELLM_VERSION" ]; then pass "LiteLLM $running (pinned ${LITELLM_IMAGE_DIGEST:0:19}…)"
+else fail "$CODE running=v$running want $LITELLM_VERSION"; fi
+
 # ---------------------------------------------------------------- Edge
 echo "== Edge"
 CURRENT=E1
@@ -131,7 +150,7 @@ else skip "CloudFront not in use and ALB is public"; fi
 
 CURRENT=E2
 if [ -n "$CF_DOMAIN" ]; then
-  CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://$CF_DOMAIN/health/liveliness" --max-time 20)
+  CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://${BASE#https://}/health/liveliness" --max-time 20)
   [[ "$CODE" =~ ^30[1278]$ ]] && pass "http -> $CODE redirect" || fail "http -> $CODE"
 else skip "CloudFront not in use"; fi
 
@@ -143,6 +162,34 @@ CURRENT=E4; req GET "$BASE/bedrock/health/liveliness" ""
 
 CURRENT=E5; CODE=$(curl -sL -o "$TMP/body" -w '%{http_code}' "$BASE/ui/" --max-time 30)
 [ "$CODE" = 200 ] && grep -qi '<html' "$TMP/body" && pass "/ui/ 200 html" || fail "/ui/ $CODE"
+
+CURRENT=E6
+if [ -n "$FQDN" ] && [ "$scheme" = internal ]; then
+  vo_id=$(aws cloudfront get-distribution-config --id "$CF_ID" --query 'DistributionConfig.Origins.Items[0].VpcOriginConfig.VpcOriginId' --output text 2>/dev/null)
+  policy=$(aws cloudfront get-vpc-origin --id "$vo_id" --query 'VpcOrigin.VpcOriginEndpointConfig.OriginProtocolPolicy' --output text 2>/dev/null)
+  [ "$policy" = https-only ] && pass "CloudFront -> ALB over HTTPS (VPC origin $policy)" || fail "VPC origin protocol policy: $policy"
+else skip "no custom domain: the CloudFront -> ALB hop is HTTP inside the AWS network"; fi
+
+CURRENT=E7
+if [ -n "$FQDN" ]; then
+  a=$(dig +short A "$FQDN" | head -1); aaaa=$(dig +short AAAA "$FQDN" | head -1)
+  # no -k: the certificate must verify for the custom name
+  CODE=$(curl -s -o /dev/null -w '%{http_code}' "https://$FQDN/health/liveliness" --max-time 20) || CODE=000
+  [ "$BASE" = "https://$FQDN" ] && [ -n "$a" ] && [ -n "$aaaa" ] && [ "$CODE" = 200 ] \
+    && pass "$FQDN: A+AAAA, valid certificate, 200" || fail "base=$BASE A=${a:-none} AAAA=${aaaa:-none} https=$CODE"
+else skip "no custom domain"; fi
+
+CURRENT=E8
+if [ -n "$CF_ID" ]; then
+  acl=$(aws cloudfront get-distribution-config --id "$CF_ID" --query 'DistributionConfig.WebACLId' --output text 2>/dev/null)
+  # Log4Shell-style header: blocked at the edge by AWSManagedRulesKnownBadInputsRuleSet
+  CODE=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/health/liveliness" -H 'X-Smoke: ${jndi:ldap://example.invalid/a}' --max-time 20)
+  regional=$(aws wafv2 get-web-acl-for-resource --resource-arn "$(aws elbv2 describe-load-balancers --names "${MAIN_STACK_NAME}-alb" --query 'LoadBalancers[0].LoadBalancerArn' --output text)" --query 'WebACL.Name' --output text 2>/dev/null)
+  if [ "${CLOUDFRONT_WAF:-true}" != true ]; then skip "CLOUDFRONT_WAF=false"
+  elif [[ "$acl" == arn:aws:wafv2:us-east-1:*:global/webacl/* ]] && [ "$CODE" = 403 ]; then
+    pass "edge ACL attached, malicious header -> 403 (regional ALB ACL: ${regional:-none})"
+  else fail "WebACLId=${acl:-none} malicious header -> $CODE"; fi
+else skip "CloudFront not in use"; fi
 
 # ---------------------------------------------------------------- Auth
 echo "== Auth"
