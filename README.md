@@ -1,5 +1,12 @@
 # Guidance for Multi-Provider Generative AI Gateway on AWS
 
+> **MyOps fork.** This fork adds a low-cost sandbox profile with a path to a production
+> setup on your own domain: CloudFront VPC origin with an internal ALB, Graviton data tier,
+> Bedrock-only defaults, admin-only key creation and an end-to-end validation suite.
+> Start with [docs/deployment.md](docs/deployment.md). Diagrams are in
+> [docs/diagrams/](docs/diagrams/README.md), tests in [validation/](validation/README.md)
+> and PoC criteria in [docs/poc-success-criteria.md](docs/poc-success-criteria.md).
+
 ## Table of contents
 
 - [Project Overview](#project-overview)
