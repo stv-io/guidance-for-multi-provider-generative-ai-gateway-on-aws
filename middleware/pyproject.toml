@@ -1,0 +1,48 @@
+[project]
+name = "llm-gateway-middleware"
+version = "0.1.0"
+description = "FastAPI middleware in front of LiteLLM (Bedrock-native APIs, chat sessions, managed prompts)"
+readme = false
+requires-python = ">=3.14,<3.15"
+# Floors are the versions pinned in the old requirements.txt; exact versions
+# are pinned in uv.lock. Upgrade with `uv lock --upgrade-package <name>`.
+dependencies = [
+    "aiohttp>=3.14.5",
+    "anyio>=4.15.1",
+    "boto3>=1.43.117",
+    "botocore>=1.43.117",
+    "cryptography>=50.0.2",
+    "fastapi>=0.159.1",
+    "google-crc32c>=1.9.0",
+    "httpx>=0.28.1",
+    "okta-jwt-verifier>=0.5.0",
+    "openai>=3.36.1",
+    "psycopg2-binary>=2.9.13",
+    "pydantic>=2.14.1",
+    "requests>=2.34.2",
+    # SQLAlchemy 2.1 maps postgresql:// to psycopg (v3), not psycopg2; the
+    # DB URL from Secrets Manager is postgresql://, so stay on 2.0 until
+    # app.py and the driver move to psycopg 3 together.
+    "sqlalchemy>=2.0.44,<2.1",
+    "uvicorn>=0.54.0",
+]
+
+[dependency-groups]
+dev = ["ruff>=0.17.1"]
+
+[tool.uv]
+# app.py is a single module, not an installable package.
+package = false
+
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+
+[tool.ruff.lint]
+# pycodestyle errors, pyflakes, import-sorting-free baseline. Kept small so the
+# existing app.py passes without churn; tighten deliberately in later changes.
+select = ["E4", "E7", "E9", "F", "B"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
