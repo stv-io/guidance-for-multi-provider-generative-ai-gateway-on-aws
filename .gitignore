@@ -41,3 +41,7 @@ resources.txt
 errored.tfstate
 validation/results/
 tfplan
+# Python / uv
+.venv/
+.ruff_cache/
+__pycache__/

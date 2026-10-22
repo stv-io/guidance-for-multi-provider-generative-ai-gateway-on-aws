@@ -405,6 +405,45 @@ quotas](https://docs.aws.amazon.com/general/latest/gr/aws-general.pdf#aws-servic
 
 Please find detailed guidance deployment and usage instructions in the Implementation Guide [here](https://aws-solutions-library-samples.github.io/ai-ml/guidance-for-multi-provider-generative-ai-gateway-on-aws.html )
 
+## Python tooling
+
+Python dependencies are managed with [uv](https://docs.astral.sh/uv/). There are two separate uv projects, each with its own `uv.lock`:
+
+- `middleware/` is the FastAPI middleware image. `middleware/Dockerfile` installs it with `uv sync --frozen --no-dev`, so `deploy.sh` needs no local Python. Add or upgrade a dependency with `cd middleware && uv add <pkg>` (or `uv lock --upgrade-package <pkg>`), then commit `pyproject.toml` and `uv.lock` together.
+- The repository root is the developer tooling for `tests/`, `scripts/` and `test-middleware-*.py`.
+
+### Running the tests and scripts
+
+Copy `tests/.env.template` to `tests/.env` (and `scripts/.env.template` to `scripts/.env`) and fill in the values. The scripts read the same environment variables as before, from the environment or that `.env` file.
+
+```bash
+uv sync                                                # one-off: create .venv from uv.lock
+
+# Integration tests (API_ENDPOINT, API_KEY, MODEL_ID, MANAGED_PROMPT_*)
+uv run pytest tests/openai_chat_test_file.py
+uv run pytest tests/bedrock_chat_test_file.py
+uv run pytest tests/management_apis_test_file.py
+
+# Load test (API_ENDPOINT, API_KEY)
+uv run locust -f tests/locust_load_test.py
+
+# Benchmark (BASE_URL, API_KEY, MODELS)
+uv run python scripts/benchmark.py
+
+# Middleware smoke tests (API_ENDPOINT, API_KEY, AWS_REGION)
+uv run python test-middleware-synchronous.py
+uv run python test-middleware-streaming.py
+```
+
+### Lint, format and pre-commit hooks
+
+```bash
+uv run ruff check . && uv run ruff format --check .    # root tooling
+(cd middleware && uv run ruff check . && uv run ruff format --check .)
+pre-commit install                                     # once per clone
+pre-commit run --all-files
+```
+
 ## Workshop
 
 Follow the step-by-step instructions provided in this [workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/db0f23ea-2442-4962-9a54-04dcdab7de59/en-US) for a deep dive hands-on experience.
