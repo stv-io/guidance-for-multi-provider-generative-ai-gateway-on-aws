@@ -1161,9 +1161,6 @@ async def forward_user_new(request: Request):
             ) from e
 
         headers, claims, signing_input, signature = JWTUtils.parse_token(token)
-        print(
-            f"headers: {headers} claims: {claims} signing_input: {signing_input} signature: {signature}"
-        )
 
         sub = claims.get("sub")
         print(f"sub: {sub}")
@@ -1185,8 +1182,6 @@ async def forward_user_new(request: Request):
         final_headers["content-length"] = str(len(request_body))
         final_headers["authorization"] = f"Bearer {MASTER_KEY}"
 
-    print(f"final_headers: {final_headers}")
-    print(f"request_body: {request_body}")
     async with httpx.AsyncClient() as client:
         response = await client.post(
             f"{LITELLM_ENDPOINT}/user/new",

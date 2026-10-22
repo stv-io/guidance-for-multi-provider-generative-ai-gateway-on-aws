@@ -67,3 +67,41 @@ model_list:
     litellm_params:
       model: bedrock/eu.meta.llama3-2-1b-instruct-v1:0
 
+
+#Current-generation models via EU cross-region inference profiles
+  - model_name: eu.anthropic.claude-haiku-4-5-20251001-v1:0
+    litellm_params:
+      model: bedrock/eu.anthropic.claude-haiku-4-5-20251001-v1:0
+
+  - model_name: eu.anthropic.claude-sonnet-4-6
+    litellm_params:
+      model: bedrock/eu.anthropic.claude-sonnet-4-6
+
+  - model_name: eu.anthropic.claude-haiku-5-5
+    litellm_params:
+      model: bedrock/eu.anthropic.claude-haiku-5-5
+
+  - model_name: eu.anthropic.claude-sonnet-5-5
+    litellm_params:
+      model: bedrock/eu.anthropic.claude-sonnet-5-5
+
+  - model_name: eu.anthropic.claude-opus-5-5
+    litellm_params:
+      model: bedrock/eu.anthropic.claude-opus-5-5
+
+  - model_name: eu.amazon.nova-micro-v1:0
+    litellm_params:
+      model: bedrock/eu.amazon.nova-micro-v1:0
+
+  - model_name: eu.amazon.nova-lite-v1:0
+    litellm_params:
+      model: bedrock/eu.amazon.nova-lite-v1:0
+
+  - model_name: eu.amazon.nova-pro-v1:0
+    litellm_params:
+      model: bedrock/eu.amazon.nova-pro-v1:0
+
+  - model_name: eu.cohere.embed-v4:0
+    litellm_params:
+      model: bedrock/eu.cohere.embed-v4:0
+      drop_params: true #Needed to avoid errors when encoding_format is passed in by openai python client
