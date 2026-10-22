@@ -19,21 +19,37 @@ resource "random_password" "cloudfront_secret" {
 # VPC origin: CloudFront reaches the internal ALB through ENIs in the private subnets, so the
 # CloudFront -> ALB hop stays on the AWS network instead of crossing the internet. With a custom
 # domain the hop is also TLS (local.origin_https).
+# CloudFront refuses to update a VPC origin that a distribution uses (CannotUpdateEntityWhileInUse),
+# so the origin is keyed by its protocol: switching protocol creates the new origin, moves the
+# distribution to it, and only then deletes the old one.
+locals {
+  vpc_origin_protocol = local.origin_https ? "https-only" : "http-only"
+}
+
 resource "aws_cloudfront_vpc_origin" "alb" {
-  count = local.use_vpc_origin ? 1 : 0
+  for_each = local.use_vpc_origin ? toset([local.vpc_origin_protocol]) : toset([])
 
   vpc_origin_endpoint_config {
-    name                   = "${var.name}-alb"
+    name                   = each.key == "http-only" ? "${var.name}-alb" : "${var.name}-alb-${each.key}"
     arn                    = aws_lb.this.arn
     http_port              = 80
     https_port             = 443
-    origin_protocol_policy = local.origin_https ? "https-only" : "http-only"
+    origin_protocol_policy = each.key
 
     origin_ssl_protocols {
       items    = ["TLSv1.2"]
       quantity = 1
     }
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+moved {
+  from = aws_cloudfront_vpc_origin.alb[0]
+  to   = aws_cloudfront_vpc_origin.alb["http-only"]
 }
 
 # CloudFront Distribution
@@ -75,7 +91,7 @@ resource "aws_cloudfront_distribution" "this" {
     dynamic "vpc_origin_config" {
       for_each = local.use_vpc_origin ? [1] : []
       content {
-        vpc_origin_id       = aws_cloudfront_vpc_origin.alb[0].id
+        vpc_origin_id       = aws_cloudfront_vpc_origin.alb[local.vpc_origin_protocol].id
         origin_read_timeout = 60
       }
     }
