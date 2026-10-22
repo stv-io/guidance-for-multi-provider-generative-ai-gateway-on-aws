@@ -250,7 +250,6 @@ resource "aws_ecs_service" "litellm_service" {
     type = "ECS"
   }
   depends_on = [
-    aws_lb_listener_rule.bedrock_models,
     aws_lb_listener_rule.openai_completions,
     aws_lb_listener_rule.chat_completions,
     aws_lb_listener_rule.chat_history,

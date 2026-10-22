@@ -215,29 +215,8 @@ resource "aws_lb_listener_rule" "catch_all" {
 }
 
 
-# Example: Listener Rules for path patterns & priorities
-# bedrock model
-resource "aws_lb_listener_rule" "bedrock_models" {
-  listener_arn = aws_lb_listener.https.arn
-  priority     = 16
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.tg_3000.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/bedrock/model/*"]
-    }
-  }
-
-  condition {
-    http_request_method {
-      values = ["POST", "GET", "PUT"]
-    }
-  }
-}
+# /bedrock/model/* (Converse, InvokeModel) has no rule of its own: it falls through to
+# LiteLLM, which serves the Bedrock pass-through natively.
 
 # OpenAICompletions
 resource "aws_lb_listener_rule" "openai_completions" {
@@ -450,38 +429,6 @@ resource "aws_lb_listener_rule" "health_check_exception_http" {
 }
 
 # Duplicate all path-specific rules for the HTTP listener with header authentication
-
-# bedrock model for HTTP
-resource "aws_lb_listener_rule" "bedrock_models_http" {
-  count        = var.use_cloudfront ? 1 : 0
-  listener_arn = aws_lb_listener.http.arn
-  priority     = 16
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.tg_3000.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/bedrock/model/*"]
-    }
-  }
-
-  condition {
-    http_request_method {
-      values = ["POST", "GET", "PUT"]
-    }
-  }
-
-  # Add CloudFront Secret header validation
-  condition {
-    http_header {
-      http_header_name = "X-CloudFront-Secret"
-      values           = ["litellm-cf-${random_password.cloudfront_secret[0].result}"]
-    }
-  }
-}
 
 # OpenAICompletions for HTTP
 resource "aws_lb_listener_rule" "openai_completions_http" {

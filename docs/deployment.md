@@ -36,7 +36,7 @@ cat .env.template envs/sandbox.env > .env     # later lines win
 # set TERRAFORM_S3_BUCKET_NAME in .env (globally unique; created if missing)
 rm -f config/config.yaml                      # regenerate from the model lists
 AWS_PROFILE=sandbox ./deploy.sh               # plans each stack, asks before applying
-AWS_PROFILE=sandbox ./validation/smoke.sh     # 29 end-to-end checks
+AWS_PROFILE=sandbox ./validation/smoke.sh     # 30 end-to-end checks
 ```
 
 `deploy.sh` writes each Terraform plan to a file, shows it, and applies that
@@ -79,6 +79,19 @@ so the environments never share state even if they share a bucket.
 | `ECS_VCPUS`, `DESIRED/MIN/MAX_CAPACITY` | 2 / 2 / 2 / 4 | Task size and autoscaling range |
 | `STACK_ENV` | empty | State key prefix; empty keeps the upstream state keys |
 | `AUTO_APPROVE` | `false` | Apply plans without the prompt |
+
+## APIs
+
+| Path | Served by | Notes |
+|---|---|---|
+| `/v1/chat/completions`, `/chat/completions` | middleware → LiteLLM | OpenAI-compatible; optional server-side chat history (`enable_history`, `session_id`) |
+| `/v1/*` (models, embeddings, …), `/key/*`, `/ui/` | LiteLLM | `/key/generate` passes through the middleware's admin check |
+| `/bedrock/model/{model}/converse`, `/converse-stream`, `/invoke` | LiteLLM (native Bedrock pass-through) | For boto3/Bedrock-SDK clients: set `endpoint_url` to `https://<service-url>/bedrock` and send a LiteLLM key as `Authorization: Bearer`. `{model}` is a `model_name` from `config/config.yaml`. Spend is tracked on the key |
+
+The upstream sample implemented the Bedrock paths in the middleware (a Converse-to-OpenAI
+translation layer with chat history and Bedrock Prompt Management ARNs). This fork removed it
+(decision D1b) in favour of LiteLLM's native pass-through, so Bedrock-native calls have no
+server-side chat history and do not accept prompt ARNs. The OpenAI path still has both.
 
 ## Access and identity
 

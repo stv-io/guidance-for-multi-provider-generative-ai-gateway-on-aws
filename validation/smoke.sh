@@ -180,6 +180,16 @@ req POST "$BASE/bedrock/model/$DEFAULT_MODEL/converse" "$MASTER_KEY" \
 txt=$(body | jq -r '.output.message.content[0].text // empty' 2>/dev/null)
 [ "$CODE" = 200 ] && [ -n "$txt" ] && pass "converse: \"${txt:0:40}\"" || fail "$CODE $(body | head -c 300)"
 
+CURRENT=M4b
+# converse-stream answers in the AWS event-stream binary framing, so check for the event types
+req POST "$BASE/bedrock/model/$DEFAULT_MODEL/converse-stream" "$MASTER_KEY" \
+  '{"messages":[{"role":"user","content":[{"text":"Count from 1 to 5"}]}],"inferenceConfig":{"maxTokens":30}}'
+if [ "$CODE" = 200 ] && LC_ALL=C grep -aq contentBlockDelta "$TMP/body" && LC_ALL=C grep -aq messageStop "$TMP/body"; then
+  pass "event stream with contentBlockDelta + messageStop"
+else
+  fail "$CODE $(LC_ALL=C tr -cd '[:print:]' <"$TMP/body" | head -c 300)"
+fi
+
 CURRENT=M6
 # Responses over ~1 KB are gzip-compressed by LiteLLM; the middleware must not relay a stale
 # Content-Encoding/Content-Length for the body it has already decompressed

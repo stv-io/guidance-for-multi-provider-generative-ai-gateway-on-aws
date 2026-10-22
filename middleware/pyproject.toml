@@ -16,7 +16,6 @@ dependencies = [
     "google-crc32c>=1.9.0",
     "httpx>=0.28.1",
     "okta-jwt-verifier>=0.5.0",
-    "openai>=3.36.1",
     "psycopg2-binary>=2.9.13",
     "pydantic>=2.14.1",
     "requests>=2.34.2",
