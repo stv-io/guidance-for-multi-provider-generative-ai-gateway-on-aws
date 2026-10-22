@@ -1,11 +1,29 @@
 terraform {
+  required_version = ">= 1.6"
   backend "s3" {}
   required_providers {
-      helm = {
-        source  = "hashicorp/helm"
-        version = "~> 2.0"
-      }
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
     }
+    # helm 3.x and kubernetes 3.x change block syntax / drop resources used by modules/eks
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.20"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
+  }
 }
 
 data "aws_caller_identity" "current" {}
@@ -31,7 +49,7 @@ provider "aws" {
 }
 
 resource "aws_servicecatalogappregistry_application" "solution_application" {
-  name        = "${local.SolutionNameKeySatisfyingRestrictions}-${data.aws_region.current.name}-${data.aws_caller_identity.current.account_id}"
+  name        = "${local.SolutionNameKeySatisfyingRestrictions}-${data.aws_region.current.region}-${data.aws_caller_identity.current.account_id}"
   description = "Service Catalog application to track and manage all your resources for the solution ${local.common_labels.SolutionNameKey}"
 
   tags = {

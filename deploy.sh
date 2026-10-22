@@ -24,12 +24,21 @@ if [ ! -f "config/config.yaml" ]; then
     exit 1
   fi
   
-  echo "Merging $base_config with $region_config for region $aws_region"
-  
-  # Extract model lists from both files and combine them
-  yq eval-all '
-    select(fileIndex == 0).model_list + select(fileIndex == 1).model_list
-  ' "$base_config" "$region_config" > "config/combined_models.yaml"
+  # .env is not sourced yet at this point, so read the flag directly (defaults to true)
+  include_base_models=$(sed -n 's/^INCLUDE_BASE_MODELS="\{0,1\}\([a-z]*\)"\{0,1\}.*/\1/p' .env 2>/dev/null)
+  include_base_models=${include_base_models:-true}
+
+  if [ "$include_base_models" = "true" ]; then
+    echo "Merging $base_config with $region_config for region $aws_region"
+
+    # Extract model lists from both files and combine them
+    yq eval-all '
+      select(fileIndex == 0).model_list + select(fileIndex == 1).model_list
+    ' "$base_config" "$region_config" > "config/combined_models.yaml"
+  else
+    echo "INCLUDE_BASE_MODELS=false: using only the $aws_region Bedrock models from $region_config"
+    yq eval '.model_list' "$region_config" > "config/combined_models.yaml"
+  fi
   
   # Get the base config without model_list
   yq eval 'del(.model_list)' "$base_config" > "config/config.yaml.tmp"
@@ -186,6 +195,7 @@ echo "EKS_X86_AMI_TYPE: $EKS_X86_AMI_TYPE"
 echo "PUBLIC_LOAD_BALANCER: $PUBLIC_LOAD_BALANCER"
 echo "RDS_INSTANCE_CLASS: $RDS_INSTANCE_CLASS"
 echo "RDS_ALLOCATED_STORAGE_GB: $RDS_ALLOCATED_STORAGE_GB"
+echo "RDS_MULTI_AZ: ${RDS_MULTI_AZ:-true}"
 echo "REDIS_NODE_TYPE: $REDIS_NODE_TYPE"
 echo "REDIS_NUM_CACHE_CLUSTERS: $REDIS_NUM_CACHE_CLUSTERS"
 echo "DISABLE_SWAGGER_PAGE: $DISABLE_SWAGGER_PAGE"
@@ -364,6 +374,7 @@ export TF_VAR_ecrLitellmRepository=$APP_NAME
 export TF_VAR_ecrMiddlewareRepository=$MIDDLEWARE_APP_NAME
 export TF_VAR_rds_instance_class=$RDS_INSTANCE_CLASS
 export TF_VAR_rds_allocated_storage=$RDS_ALLOCATED_STORAGE_GB
+export TF_VAR_rds_multi_az=${RDS_MULTI_AZ:-true}
 export TF_VAR_redis_node_type=$REDIS_NODE_TYPE
 export TF_VAR_redis_num_cache_clusters=$REDIS_NUM_CACHE_CLUSTERS
 export TF_VAR_disable_swagger_page=$DISABLE_SWAGGER_PAGE

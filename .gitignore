@@ -25,7 +25,6 @@ litellm-cdk/resources.txt
 **/myenv/
 **/fresh_venv/
 *.pyc
-.terraform.lock.hcl
 .terraform
 terraform.tfstate
 terraform.tfstate.backup

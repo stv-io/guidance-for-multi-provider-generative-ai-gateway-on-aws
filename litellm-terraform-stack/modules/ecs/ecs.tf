@@ -5,7 +5,7 @@ resource "aws_ecs_cluster" "this" {
 
   setting {
     name  = "containerInsights"
-    value = "enabled"
+    value = "disabled"
   }
 }
 
@@ -33,12 +33,12 @@ resource "aws_ecs_task_definition" "litellm" {
       "logDriver": "awslogs",
       "options": {
         "awslogs-group": "/ecs/${var.name}-litellm",
-        "awslogs-region": "${data.aws_region.current.name}",
+        "awslogs-region": "${data.aws_region.current.region}",
         "awslogs-stream-prefix": "LiteLLM"
       }
     },
     "environment": [
-      { "name": "LITELLM_LOG", "value": "DEBUG" },
+      { "name": "LITELLM_LOG", "value": "INFO" },
       { "name": "LITELLM_CONFIG_BUCKET_NAME", "value": "${var.config_bucket_name}" },
       { "name": "LITELLM_CONFIG_BUCKET_OBJECT_KEY", "value": "config.yaml" },
       { "name": "UI_USERNAME", "value": "admin" },
@@ -73,91 +73,91 @@ resource "aws_ecs_task_definition" "litellm" {
       },
       {
         "name": "OPENAI_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:OPENAI_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:OPENAI_API_KEY::"
       },
       {
         "name": "AZURE_OPENAI_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:AZURE_OPENAI_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:AZURE_OPENAI_API_KEY::"
       },
       {
         "name": "AZURE_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:AZURE_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:AZURE_API_KEY::"
       },
       {
         "name": "ANTHROPIC_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:ANTHROPIC_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:ANTHROPIC_API_KEY::"
       },
       {
         "name": "GROQ_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:GROQ_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:GROQ_API_KEY::"
       },
       {
         "name": "COHERE_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:COHERE_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:COHERE_API_KEY::"
       },
       {
         "name": "CO_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:CO_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:CO_API_KEY::"
       },
       {
         "name": "HF_TOKEN",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:HF_TOKEN::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:HF_TOKEN::"
       },
       {
         "name": "HUGGINGFACE_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:HUGGINGFACE_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:HUGGINGFACE_API_KEY::"
       },
       {
         "name": "DATABRICKS_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:DATABRICKS_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:DATABRICKS_API_KEY::"
       },
       {
         "name": "GEMINI_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:GEMINI_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:GEMINI_API_KEY::"
       },
       {
         "name": "CODESTRAL_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:CODESTRAL_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:CODESTRAL_API_KEY::"
       },
       {
         "name": "MISTRAL_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:MISTRAL_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:MISTRAL_API_KEY::"
       },
       {
         "name": "AZURE_AI_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:AZURE_AI_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:AZURE_AI_API_KEY::"
       },
       {
         "name": "NVIDIA_NIM_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:NVIDIA_NIM_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:NVIDIA_NIM_API_KEY::"
       },
       {
         "name": "XAI_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:XAI_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:XAI_API_KEY::"
       },
       {
         "name": "PERPLEXITYAI_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:PERPLEXITYAI_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:PERPLEXITYAI_API_KEY::"
       },
       {
         "name": "GITHUB_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:GITHUB_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:GITHUB_API_KEY::"
       },
       {
         "name": "DEEPSEEK_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:DEEPSEEK_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:DEEPSEEK_API_KEY::"
       },
       {
         "name": "AI21_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:AI21_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:AI21_API_KEY::"
       },
       {
         "name": "LANGSMITH_API_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:LANGSMITH_API_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:LANGSMITH_API_KEY::"
       },
       {
         "name": "LANGFUSE_SECRET_KEY",
-        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:LANGFUSE_SECRET_KEY::"
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.secret_arn}:LANGFUSE_SECRET_KEY::"
       }
     ],
     "portMappings": [
@@ -181,7 +181,7 @@ resource "aws_ecs_task_definition" "litellm" {
       "logDriver": "awslogs",
       "options": {
         "awslogs-group": "/ecs/${var.name}-middleware",
-        "awslogs-region": "${data.aws_region.current.name}",
+        "awslogs-region": "${data.aws_region.current.region}",
         "awslogs-stream-prefix": "Middleware"
       }
     },

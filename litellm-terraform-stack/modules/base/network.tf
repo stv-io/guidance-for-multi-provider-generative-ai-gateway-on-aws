@@ -101,7 +101,7 @@ data "aws_availability_zones" "available" {
 resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
   count             = local.creating_new_vpc ? 1 : 0
   name_prefix              = "/aws/vpc/${var.name}-flow-logs"
-  retention_in_days = 365
+  retention_in_days = 14
 }
 
 resource "aws_flow_log" "this" {
@@ -110,8 +110,8 @@ resource "aws_flow_log" "this" {
   log_destination_type = "cloud-watch-logs"
   vpc_id               = aws_vpc.new[0].id
   iam_role_arn         = aws_iam_role.vpc_flow_logs_role[0].arn
-  traffic_type         = "ALL"
-  max_aggregation_interval = 60
+  traffic_type         = "REJECT"
+  max_aggregation_interval = 600
 }
 
 data "aws_subnets" "existing_all" {

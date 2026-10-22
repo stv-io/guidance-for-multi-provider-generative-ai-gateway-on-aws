@@ -30,6 +30,7 @@ module "base" {
   publicLoadBalancer = var.public_load_balancer
   rds_instance_class = var.rds_instance_class
   rds_allocated_storage = var.rds_allocated_storage
+  rds_multi_az = var.rds_multi_az
   redis_node_type = var.redis_node_type
   redis_num_cache_clusters = var.redis_num_cache_clusters
   use_route53 = var.use_route53

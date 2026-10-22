@@ -341,6 +341,12 @@ variable "rds_instance_class" {
   description = "The instance class for the RDS database"
 }
 
+variable "rds_multi_az" {
+  type        = bool
+  default     = true
+  description = "Whether the RDS database is deployed Multi-AZ"
+}
+
 variable "rds_allocated_storage" {
   type        = number
   description = "The allocated storage in GB for the RDS database"

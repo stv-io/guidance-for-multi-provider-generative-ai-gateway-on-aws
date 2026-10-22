@@ -92,6 +92,9 @@ locals {
 
 locals {
   create_endpoints = (local.creating_new_vpc || var.create_vpc_endpoints_in_existing_vpc)
+  # Interface endpoints cost ~$7/month per AZ each; with a NAT gateway the traffic can take that
+  # route instead, so only create them when outbound access is disabled or explicitly requested.
+  create_interface_endpoints = local.create_endpoints && (var.disable_outbound_network_access || var.create_vpc_endpoints_in_existing_vpc)
 }
 
 data "aws_route_tables" "existing_vpc_all" {
@@ -114,7 +117,7 @@ locals {
 
 data "aws_vpc_endpoint_service" "bedrock_agent" {
   # This service name must match exactly what you used in the resource
-  service_name = "com.amazonaws.${data.aws_region.current.name}.bedrock-agent"
+  service_name = "com.amazonaws.${data.aws_region.current.region}.bedrock-agent"
 }
 
 data "aws_subnet" "chosen_subnets" {
