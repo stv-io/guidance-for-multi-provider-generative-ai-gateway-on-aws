@@ -25,7 +25,7 @@ if [ ! -f "config/config.yaml" ]; then
   fi
   
   # .env is not sourced yet at this point, so read the flag directly (defaults to true)
-  include_base_models=$(sed -n 's/^INCLUDE_BASE_MODELS="\{0,1\}\([a-z]*\)"\{0,1\}.*/\1/p' .env 2>/dev/null)
+  include_base_models=$(sed -n 's/^INCLUDE_BASE_MODELS="\{0,1\}\([a-z]*\)"\{0,1\}.*/\1/p' .env 2>/dev/null | tail -n 1)
   include_base_models=${include_base_models:-true}
 
   if [ "$include_base_models" = "true" ]; then

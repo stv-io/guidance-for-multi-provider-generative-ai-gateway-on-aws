@@ -52,3 +52,8 @@ output "cloudfront_auth_secret" {
   value       = var.use_cloudfront ? try(module.ecs_cluster[0].cloudfront_auth_secret, null) : null
   sensitive   = true
 }
+
+output "alb_dns_name" {
+  description = "The DNS name of the ALB (ECS deployments)"
+  value       = try(module.ecs_cluster[0].alb_dns_name, "")
+}
