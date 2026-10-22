@@ -233,7 +233,8 @@ if [ -n "${SID:-}" ] && [ -n "$KEY" ]; then
 else skip "needs H1 session and K1 key"; fi
 
 CURRENT=K2
-if [ -n "$KEY" ]; then req POST "$BASE/v1/chat/completions" "$KEY" "$(chat_json "$DEFAULT_MODEL")"
+# A unique prompt: LiteLLM's response cache answers repeated prompts at zero cost, and K4 needs real spend
+if [ -n "$KEY" ]; then req POST "$BASE/v1/chat/completions" "$KEY" "$(chat_json "$DEFAULT_MODEL" "Reply with one word. Run $(date +%s)-$RANDOM")"
   [ "$CODE" = 200 ] && pass "allowed model -> 200" || fail "allowed model -> $CODE $(body | head -c 200)"
 else skip "no K1 key"; fi
 
