@@ -16,7 +16,7 @@ else case $(uname -m) in x86_64) ARCH=x86 ;; *) ARCH=arm ;; esac; fi
 LOG_BUCKET_ARN=$(terraform -chdir=litellm-s3-log-bucket-terraform output -raw LogBucketArn 2>/dev/null)
 set +a
 
-eval "$(grep -E '^export TF_VAR_[a-z_A-Z]+=' deploy.sh)"
+eval "$(grep -E '^export TF_VAR_[a-zA-Z0-9_]+=' deploy.sh)"
 [ -n "${LANGFUSE_HOST:-}" ] && export TF_VAR_langfuse_host=$LANGFUSE_HOST
 if [ -n "$EXISTING_EKS_CLUSTER_NAME" ]; then export TF_VAR_create_cluster="false"; else export TF_VAR_create_cluster="true"; fi
 
