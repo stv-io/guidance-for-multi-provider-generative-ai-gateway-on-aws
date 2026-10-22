@@ -77,6 +77,25 @@ MAIN_STACK_NAME="litellm-stack"
 TRACKING_STACK_NAME="tracking-stack"
 # Load environment variables from .env file
 source .env
+STACK_ENV=${STACK_ENV:-}
+AUTO_APPROVE=${AUTO_APPROVE:-false}
+
+# Plan, show it, and apply only that plan: on AUTO_APPROVE=true, or after confirmation on a terminal
+tf_plan_apply() {
+    terraform plan -input=false -out=tfplan "$@"
+    if [ "$AUTO_APPROVE" = "true" ]; then
+        :
+    elif [ -t 0 ]; then
+        read -r -p "Apply this plan? [y/N] " answer
+        [ "$answer" = "y" ] || { echo "Aborted; nothing applied."; rm -f tfplan; exit 1; }
+    else
+        echo "Not running on a terminal and AUTO_APPROVE is not true: stopping after plan."
+        rm -f tfplan
+        exit 1
+    fi
+    terraform apply -input=false tfplan
+    rm -f tfplan
+}
 
 # Auto-detect existing deployments and set defaults for backward compatibility
 if aws cloudformation describe-stacks --stack-name "${TRACKING_STACK_NAME}" &>/dev/null; then
@@ -252,14 +271,14 @@ export TF_VAR_name=$LOG_BUCKET_STACK_NAME
 
 cat > backend.hcl << EOF
 bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
-key     = "terraform-log-bucket.tfstate"
+key     = "${STACK_ENV:+${STACK_ENV}/}terraform-log-bucket.tfstate"
 region  = "${aws_region}"
 encrypt = true
 EOF
 echo "Generated backend.hcl configuration"
 
 terraform init -backend-config=backend.hcl
-terraform apply -auto-approve
+tf_plan_apply
 
 if [ $? -eq 0 ]; then
     echo "Log Bucket Deployment successful. Extracting outputs..."
@@ -402,7 +421,7 @@ fi
 
 cat > backend.hcl << EOF
 bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
-key     = "terraform-unified.tfstate"
+key     = "${STACK_ENV:+${STACK_ENV}/}terraform-unified.tfstate"
 region  = "${aws_region}"
 encrypt = true
 EOF
@@ -411,9 +430,9 @@ echo "Generated backend.hcl configuration"
 terraform init -backend-config=backend.hcl
 if [ -z "$EXISTING_VPC_ID" ] && [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     echo "Deploying base of terraform first for case of new vpc and eks"
-    terraform apply -target=module.base -auto-approve
+    tf_plan_apply -target=module.base
 fi
-terraform apply -auto-approve
+tf_plan_apply
 
 if [ $? -eq 0 ]; then
     echo "Deployment successful. Extracting outputs..."

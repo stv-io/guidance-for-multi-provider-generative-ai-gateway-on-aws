@@ -221,7 +221,7 @@ fi
 
 cat > backend.hcl << EOF
 bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
-key     = "terraform-unified.tfstate"
+key     = "${STACK_ENV:+${STACK_ENV}/}terraform-unified.tfstate"
 region  = "${aws_region}"
 encrypt = true
 EOF
@@ -242,7 +242,7 @@ cd litellm-s3-log-bucket-terraform
 
 cat > backend.hcl << EOF
 bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
-key     = "terraform-log-bucket.tfstate"
+key     = "${STACK_ENV:+${STACK_ENV}/}terraform-log-bucket.tfstate"
 region  = "${aws_region}"
 encrypt = true
 EOF

@@ -40,3 +40,4 @@ backend.hcl
 resources.txt
 errored.tfstate
 validation/results/
+tfplan
