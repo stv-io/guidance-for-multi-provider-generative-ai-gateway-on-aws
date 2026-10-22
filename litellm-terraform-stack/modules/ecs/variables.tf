@@ -351,3 +351,15 @@ variable "langfuse_host" {
   type    = string
   description = "the hostname of your langfuse deployment."
 }
+
+variable "cloudfront_vpc_origin" {
+  description = "Reach the ALB through a CloudFront VPC origin: the ALB becomes internal (private subnets) and only CloudFront can reach it, over the AWS network"
+  type        = bool
+  default     = true
+}
+
+variable "cloudfront_certificate_arn" {
+  description = "ACM certificate in us-east-1 for the CloudFront custom domain. Falls back to certificate_arn when empty (only valid if the stack is in us-east-1)"
+  type        = string
+  default     = ""
+}

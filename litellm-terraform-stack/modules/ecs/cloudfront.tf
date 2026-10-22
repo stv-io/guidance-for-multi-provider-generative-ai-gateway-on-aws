@@ -16,6 +16,30 @@ resource "random_password" "cloudfront_secret" {
   }
 }
 
+# VPC origin: CloudFront reaches the internal ALB through ENIs in the private subnets, so the
+# CloudFront -> ALB hop stays on the AWS network instead of crossing the internet.
+resource "aws_cloudfront_vpc_origin" "alb" {
+  count = local.use_vpc_origin ? 1 : 0
+
+  vpc_origin_endpoint_config {
+    name                   = "${var.name}-alb"
+    arn                    = aws_lb.this.arn
+    http_port              = 80
+    https_port             = 443
+    origin_protocol_policy = "http-only"
+
+    origin_ssl_protocols {
+      items    = ["TLSv1.2"]
+      quantity = 1
+    }
+  }
+}
+
+locals {
+  # CloudFront only accepts us-east-1 certificates; certificate_arn is the regional ALB certificate
+  cloudfront_certificate_arn = var.cloudfront_certificate_arn != "" ? var.cloudfront_certificate_arn : var.certificate_arn
+}
+
 # CloudFront Distribution
 resource "aws_cloudfront_distribution" "this" {
   count               = var.use_cloudfront ? 1 : 0
@@ -38,20 +62,36 @@ resource "aws_cloudfront_distribution" "this" {
     }
     
     # Security note on CloudFront-ALB communication:
-    # 
-    # By setting origin_protocol_policy = "http-only", communication between CloudFront and ALB 
-    # is unencrypted. However, security is maintained through:
+    #
+    # Default (cloudfront_vpc_origin = true): the ALB is internal and CloudFront reaches it through a
+    # VPC origin, so the HTTP hop never leaves the AWS network and the ALB has no public address.
+    # The secret header below is kept as a second layer.
+    #
+    # cloudfront_vpc_origin = false: the ALB is public and the CloudFront -> ALB hop is plain HTTP
+    # over the internet. Security then rests on:
     #
     # 1. Custom header authentication (X-CloudFront-Secret) that prevents direct access to the ALB
     # 2. Communication between end users and CloudFront remains encrypted with HTTPS
     # 3. The ALB is configured to reject requests without the secret header
     #
     # This approach eliminates certificate validation issues while maintaining a strong security posture.
-    custom_origin_config {
-      http_port              = 80
-      https_port             = 443
-      origin_protocol_policy = "http-only"
-      origin_ssl_protocols   = ["TLSv1.2"]
+    dynamic "custom_origin_config" {
+      for_each = local.use_vpc_origin ? [] : [1]
+      content {
+        http_port              = 80
+        https_port             = 443
+        origin_protocol_policy = "http-only"
+        origin_ssl_protocols   = ["TLSv1.2"]
+        origin_read_timeout    = 60
+      }
+    }
+
+    dynamic "vpc_origin_config" {
+      for_each = local.use_vpc_origin ? [1] : []
+      content {
+        vpc_origin_id       = aws_cloudfront_vpc_origin.alb[0].id
+        origin_read_timeout = 60
+      }
     }
   }
   
@@ -79,9 +119,9 @@ resource "aws_cloudfront_distribution" "this" {
   
   # Use the provided certificate if Route53 is enabled with a custom domain
   dynamic "viewer_certificate" {
-    for_each = var.use_route53 && var.certificate_arn != "" ? [1] : []
+    for_each = var.use_route53 && local.cloudfront_certificate_arn != "" ? [1] : []
     content {
-      acm_certificate_arn = var.certificate_arn
+      acm_certificate_arn = local.cloudfront_certificate_arn
       ssl_support_method  = "sni-only"
       minimum_protocol_version = "TLSv1.2_2021"
     }
@@ -89,7 +129,7 @@ resource "aws_cloudfront_distribution" "this" {
   
   # Use CloudFront default certificate if no Route53 or certificate is provided
   dynamic "viewer_certificate" {
-    for_each = !var.use_route53 || var.certificate_arn == "" ? [1] : []
+    for_each = !var.use_route53 || local.cloudfront_certificate_arn == "" ? [1] : []
     content {
       cloudfront_default_certificate = true
     }

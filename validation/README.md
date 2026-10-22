@@ -30,7 +30,7 @@ of a cent; `ALL_MODELS=1` costs a few cents.
 | **I3** | Infra | Cache is the intended engine and size | ElastiCache replication group: engine `valkey`, node type from `.env`, transit and at-rest encryption on |
 | **I4** | Infra | Service is healthy on Graviton | ECS service `runningCount == desiredCount`, task `cpuArchitecture == ARM64`, every container `HEALTHY` |
 | **I5** | Infra | Cost profile: no interface endpoints | The stack VPC has no `Interface` VPC endpoints when outbound access is enabled, and does have the S3 `Gateway` endpoint |
-| **E1** | Edge | ALB is locked to CloudFront | A request straight to the ALB without the CloudFront secret header is rejected (403) |
+| **E1** | Edge | ALB is locked to CloudFront | VPC origin (default): the ALB scheme is `internal` and it cannot be reached from the internet. Public ALB: a request without the CloudFront secret header gets 403 |
 | **E2** | Edge | HTTP is upgraded | `http://<cloudfront>/` redirects (301/302/307/308) to HTTPS |
 | **E3** | Edge | LiteLLM is reachable through CloudFront | `GET /health/liveliness` returns 200 |
 | **E4** | Edge | Middleware is reachable and can reach LiteLLM | `GET /bedrock/health/liveliness` returns 200 with `"litellm": "connected"` |

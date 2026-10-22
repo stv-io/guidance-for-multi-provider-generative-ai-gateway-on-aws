@@ -1,15 +1,22 @@
 ###############################################################################
 # (8) Application Load Balancer, Listener, Target Groups
 ###############################################################################
+locals {
+  # With a CloudFront VPC origin the ALB is internal and only CloudFront can reach it
+  use_vpc_origin = var.use_cloudfront && var.cloudfront_vpc_origin
+  alb_internal   = local.use_vpc_origin || !var.public_load_balancer
+}
+
 # ALB
 resource "aws_lb" "this" {
   name               = "${var.name}-alb"
   load_balancer_type = "application"
-  subnets            = var.public_load_balancer ? var.public_subnets : var.private_subnets
+  subnets            = local.alb_internal ? var.private_subnets : var.public_subnets
   # You need to supply a security group for the ALB itself:
   security_groups    = [aws_security_group.alb_sg.id]
-  internal           = var.public_load_balancer ? false : true
-  idle_timeout       = 60
+  internal           = local.alb_internal
+  # Long non-streaming completions can exceed 60 s between bytes
+  idle_timeout       = 120
   drop_invalid_header_fields = true
   access_logs {
     bucket  = aws_s3_bucket.access_log_bucket.bucket
@@ -139,8 +146,7 @@ resource "aws_lb_listener_rule" "health_check_exception" {
       values = [
         "/",                         # Root path
         "/health",                   # Base health endpoint
-        "/health/liveliness",        # Specific health endpoint
-        "/bedrock/health/liveliness" # Middleware health endpoint
+        "/health/liveliness"         # Specific health endpoint
       ]
     }
   }
@@ -437,8 +443,7 @@ resource "aws_lb_listener_rule" "health_check_exception_http" {
       values = [
         "/",                         # Root path
         "/health",                   # Base health endpoint
-        "/health/liveliness",        # Specific health endpoint
-        "/bedrock/health/liveliness" # Middleware health endpoint
+        "/health/liveliness"         # Specific health endpoint
       ]
     }
   }

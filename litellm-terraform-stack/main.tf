@@ -52,6 +52,8 @@ module "ecs_cluster" {
   use_route53 = var.use_route53
   use_cloudfront = var.use_cloudfront
   cloudfront_price_class = var.cloudfront_price_class
+  cloudfront_vpc_origin = var.cloudfront_vpc_origin
+  cloudfront_certificate_arn = var.cloudfront_certificate_arn
   openai_api_key = var.openai_api_key
   azure_openai_api_key = var.azure_openai_api_key
   azure_api_key = var.azure_api_key

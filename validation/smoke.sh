@@ -119,10 +119,15 @@ else fail "interface=$n_if s3_gateway=$n_s3"; fi
 # ---------------------------------------------------------------- Edge
 echo "== Edge"
 CURRENT=E1
-if [ -n "$CF_DOMAIN" ]; then
-  CODE=$(curl -sk -o /dev/null -w '%{http_code}' "https://$ALB/v1/models" -H "Authorization: Bearer $MASTER_KEY" --max-time 20)
-  [ "$CODE" = 403 ] && pass "direct ALB request -> 403" || fail "direct ALB request -> $CODE (want 403)"
-else skip "CloudFront not in use"; fi
+scheme=$(aws elbv2 describe-load-balancers --names "${MAIN_STACK_NAME}-alb" --query 'LoadBalancers[0].Scheme' --output text 2>/dev/null)
+if [ "$scheme" = internal ]; then
+  # VPC origin: the ALB has no public address; its name must not resolve to anything reachable from here
+  CODE=$(curl -sk -o /dev/null -w '%{http_code}' "https://$ALB/v1/models" --max-time 10) || CODE=000
+  [ "$CODE" = 000 ] && pass "ALB is internal and unreachable from the internet" || fail "internal ALB answered from outside: $CODE"
+elif [ -n "$CF_DOMAIN" ]; then
+  CODE=$(curl -sk -o /dev/null -w '%{http_code}' "https://$ALB/v1/models" --max-time 20)
+  [ "$CODE" = 403 ] && pass "public ALB without CloudFront header -> 403" || fail "direct ALB request -> $CODE (want 403)"
+else skip "CloudFront not in use and ALB is public"; fi
 
 CURRENT=E2
 if [ -n "$CF_DOMAIN" ]; then
