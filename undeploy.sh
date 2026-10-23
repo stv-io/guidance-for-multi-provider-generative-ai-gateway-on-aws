@@ -65,22 +65,15 @@ echo "AI21_API_KEY: $AI21_API_KEY"
 echo "LANGSMITH_API_KEY: $LANGSMITH_API_KEY"
 echo "LANGSMITH_PROJECT: $LANGSMITH_PROJECT"
 echo "LANGSMITH_DEFAULT_RUN_NAME: $LANGSMITH_DEFAULT_RUN_NAME"
-echo "DEPLOYMENT_PLATFORM: $DEPLOYMENT_PLATFORM"
-echo "EXISTING_EKS_CLUSTER_NAME: $EXISTING_EKS_CLUSTER_NAME"
 echo "EXISTING_VPC_ID: $EXISTING_VPC_ID"
 echo "DISABLE_OUTBOUND_NETWORK_ACCESS: $DISABLE_OUTBOUND_NETWORK_ACCESS"
 echo "CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC: $CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC"
-echo "INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER: $INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER"
 echo "DESIRED_CAPACITY: $DESIRED_CAPACITY"
 echo "MIN_CAPACITY: $MIN_CAPACITY"
 echo "MAX_CAPACITY: $MAX_CAPACITY"
 echo "ECS_CPU_TARGET_UTILIZATION_PERCENTAGE: $ECS_CPU_TARGET_UTILIZATION_PERCENTAGE"
 echo "ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE: $ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE"
 echo "ECS_VCPUS: $ECS_VCPUS"
-echo "EKS_ARM_INSTANCE_TYPE: $EKS_ARM_INSTANCE_TYPE"
-echo "EKS_X86_INSTANCE_TYPE: $EKS_X86_INSTANCE_TYPE"
-echo "EKS_ARM_AMI_TYPE: $EKS_ARM_AMI_TYPE"
-echo "EKS_X86_AMI_TYPE: $EKS_X86_AMI_TYPE"
 echo "PUBLIC_LOAD_BALANCER: $PUBLIC_LOAD_BALANCER"
 echo "RDS_INSTANCE_CLASS: $PUBLIC_LOAD_BALANCER"
 echo "RDS_ALLOCATED_STORAGE_GB: $RDS_ALLOCATED_STORAGE_GB"
@@ -145,7 +138,6 @@ cd ..
 echo "Destroying litellm-terraform-stack"
 cd litellm-terraform-stack
 
-export TF_VAR_deployment_platform=$DEPLOYMENT_PLATFORM
 export TF_VAR_name=$MAIN_STACK_NAME
 export TF_VAR_vpc_id=$EXISTING_VPC_ID
 export TF_VAR_log_bucket_arn=$LOG_BUCKET_ARN
@@ -155,7 +147,6 @@ export TF_VAR_azure_openai_api_key=$AZURE_OPENAI_API_KEY
 export TF_VAR_azure_api_key=$AZURE_API_KEY
 export TF_VAR_anthropic_api_key=$ANTHROPIC_API_KEY
 export TF_VAR_public_load_balancer=$PUBLIC_LOAD_BALANCER
-export TF_VAR_existing_cluster_name=$EXISTING_EKS_CLUSTER_NAME
 export TF_VAR_groq_api_key=$GROQ_API_KEY
 export TF_VAR_cohere_api_key=$COHERE_API_KEY
 export TF_VAR_co_api_key=$CO_API_KEY
@@ -189,11 +180,6 @@ export TF_VAR_max_capacity=$MAX_CAPACITY
 export TF_VAR_cpu_target_utilization_percent=$ECS_CPU_TARGET_UTILIZATION_PERCENTAGE
 export TF_VAR_memory_target_utilization_percent=$ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE
 export TF_VAR_vcpus=$ECS_VCPUS
-export TF_VAR_install_add_ons_in_existing_eks_cluster=$INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER
-export TF_VAR_arm_instance_type=$EKS_ARM_INSTANCE_TYPE
-export TF_VAR_x86_instance_type=$EKS_X86_INSTANCE_TYPE
-export TF_VAR_arm_ami_type=$EKS_ARM_AMI_TYPE
-export TF_VAR_x86_ami_type=$EKS_X86_AMI_TYPE
 export TF_VAR_create_vpc_endpoints_in_existing_vpc=$CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC
 export TF_VAR_ecrLitellmRepository=$APP_NAME
 export TF_VAR_ecrMiddlewareRepository=$MIDDLEWARE_APP_NAME
@@ -208,20 +194,22 @@ export TF_VAR_langfuse_secret_key=$LANGFUSE_SECRET_KEY
 export TF_VAR_use_route53=$USE_ROUTE53
 export TF_VAR_use_cloudfront=$USE_CLOUDFRONT
 export TF_VAR_cloudfront_price_class=$CLOUDFRONT_PRICE_CLASS
+export TF_VAR_cloudfront_vpc_origin=${CLOUDFRONT_VPC_ORIGIN:-true}
+export TF_VAR_cloudfront_certificate_arn=${CLOUDFRONT_CERTIFICATE_ARN:-}
+export TF_VAR_cloudfront_waf=${CLOUDFRONT_WAF:-true}
+export TF_VAR_cloudfront_waf_rate_limit=${CLOUDFRONT_WAF_RATE_LIMIT:-2000}
+export TF_VAR_nat_gateway_per_az=${NAT_GATEWAY_PER_AZ:-false}
+export TF_VAR_alarm_email=${ALARM_EMAIL:-}
+export TF_VAR_bedrock_monthly_budget_usd=${BEDROCK_MONTHLY_BUDGET_USD:-100}
+export TF_VAR_bedrock_tokens_per_hour_alarm=${BEDROCK_TOKENS_PER_HOUR_ALARM:-2000000}
 
 if [ -n "${LANGFUSE_HOST}" ]; then
     export TF_VAR_langfuse_host=$LANGFUSE_HOST
 fi
 
-if [ -n "$EXISTING_EKS_CLUSTER_NAME" ]; then
-    export TF_VAR_create_cluster="false"
-else
-    export TF_VAR_create_cluster="true"
-fi
-
 cat > backend.hcl << EOF
 bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
-key     = "terraform-unified.tfstate"
+key     = "${STACK_ENV:+${STACK_ENV}/}terraform-unified.tfstate"
 region  = "${aws_region}"
 encrypt = true
 EOF
@@ -242,7 +230,7 @@ cd litellm-s3-log-bucket-terraform
 
 cat > backend.hcl << EOF
 bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
-key     = "terraform-log-bucket.tfstate"
+key     = "${STACK_ENV:+${STACK_ENV}/}terraform-log-bucket.tfstate"
 region  = "${aws_region}"
 encrypt = true
 EOF

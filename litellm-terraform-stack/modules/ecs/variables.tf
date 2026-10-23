@@ -262,7 +262,7 @@ variable "architecture" {
 }
 
 variable "disable_outbound_network_access" {
-    description = "Whether to disable outbound network access for the EKS Cluster"
+    description = "Whether to disable outbound network access from the VPC"
     type = bool
 }
 
@@ -307,8 +307,9 @@ variable "cpu_target_utilization_percent" {
 }
 
 variable "memory_target_utilization_percent" {
-  description = "Memory target utilization percent for autoscale"
+  description = "Memory target utilization percent for autoscale; 0 disables memory-based scaling"
   type = number
+  default = 0
 }
 
 variable "private_subnets" {
@@ -350,4 +351,34 @@ variable "langfuse_secret_key" {
 variable "langfuse_host" {
   type    = string
   description = "the hostname of your langfuse deployment."
+}
+
+variable "cloudfront_vpc_origin" {
+  description = "Reach the ALB through a CloudFront VPC origin: the ALB becomes internal (private subnets) and only CloudFront can reach it, over the AWS network"
+  type        = bool
+  default     = true
+}
+
+variable "cloudfront_certificate_arn" {
+  description = "ACM certificate in us-east-1 for the CloudFront custom domain. When empty: created by the stack if certificate_arn is also empty, otherwise falls back to certificate_arn (only valid if the stack is in us-east-1)"
+  type        = string
+  default     = ""
+}
+
+variable "cloudfront_waf" {
+  description = "Attach a CLOUDFRONT-scope web ACL (created in us-east-1) to the distribution"
+  type        = bool
+  default     = true
+}
+
+variable "cloudfront_waf_rate_limit" {
+  description = "Requests per 5 minutes from one IP before the edge WAF blocks it"
+  type        = number
+  default     = 2000
+}
+
+variable "regional_waf" {
+  description = "Associate the regional web ACL (wafv2_acl_arn) with the ALB"
+  type        = bool
+  default     = true
 }

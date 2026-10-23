@@ -25,7 +25,6 @@ litellm-cdk/resources.txt
 **/myenv/
 **/fresh_venv/
 *.pyc
-.terraform.lock.hcl
 .terraform
 terraform.tfstate
 terraform.tfstate.backup
@@ -35,8 +34,16 @@ terraform.tfstate.*
 **.env.testing
 **error.txt
 **.env
+# Environment profiles hold sizing and names only, never secrets or e-mail addresses
+!envs/*.env
 sessionmanager-bundle.zip
 sessionmanager-bundle
 backend.hcl
 resources.txt
 errored.tfstate
+validation/results/
+tfplan
+# Python / uv
+.venv/
+.ruff_cache/
+__pycache__/

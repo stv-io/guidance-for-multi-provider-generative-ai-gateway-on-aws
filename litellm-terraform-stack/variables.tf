@@ -1,19 +1,3 @@
-variable "deployment_platform" {
-  description = "Which platform to deploy (ECS or EKS)"
-  type        = string
-  
-  validation {
-    condition     = can(regex("^(ECS|EKS)$", upper(var.deployment_platform)))
-    error_message = "DEPLOYMENT_PLATFORM must be either 'ECS' or 'EKS' (case insensitive)."
-  }
-}
-
-locals {
-  platform = upper(var.deployment_platform)
-}
-
-# ECS and EKS Variables
-
 variable "name" {
   description = "Standard name to be used as prefix on all resources."
   type        = string
@@ -238,22 +222,22 @@ variable "architecture" {
 }
 
 variable "disable_outbound_network_access" {
-    description = "Whether to disable outbound network access for the EKS Cluster"
+    description = "Whether to disable outbound network access from the VPC"
     type = bool
 }
 
 variable "desired_capacity" {
-  description = "Desired Capacity on the node group and deployment"
+  description = "Desired number of ECS tasks"
   type = number
 }
 
 variable "min_capacity" {
-  description = "Min Capacity on the node group"
+  description = "Minimum number of ECS tasks (autoscaling)"
   type = number
 }
 
 variable "max_capacity" {
-  description = "Max Capacity on the node group"
+  description = "Maximum number of ECS tasks (autoscaling)"
   type = number
 }
 
@@ -262,63 +246,20 @@ variable "public_load_balancer" {
   type = bool
 }
 
-//ECS Only Variables
 variable "cpu_target_utilization_percent" {
   description = "CPU target utilization percent for autoscale"
   type = number
 }
 
 variable "memory_target_utilization_percent" {
-  description = "Memory target utilization percent for autoscale"
+  description = "Memory target utilization percent for autoscale; 0 disables memory-based scaling"
   type = number
+  default = 0
 }
 
 variable "vcpus" {
   description = "Number of ECS vcpus"
   type = number
-}
-
-# EKS Only Variables
-variable "existing_cluster_name" {
-  description = "Name of the existing EKS Cluster."
-  type        = string
-  default     = ""
-}
-
-variable "cluster_version" {
-  description = "Kubernetes version for Amazon EKS Cluster."
-  type        = string
-  default     = "1.32"
-}
-
-variable "create_cluster" {
-  description = "Controls if EKS cluster should be created"
-  type        = bool
-}
-
-variable "install_add_ons_in_existing_eks_cluster" {
-  description = "Whether to install add ons onto an existing EKS Cluster"
-  type = bool
-}
-
-variable "arm_instance_type" {
-  description = "Instance type for arm deployment"
-  type = string
-}
-
-variable "x86_instance_type" {
-  description = "Instance type for x86 deployment"
-  type = string
-}
-
-variable "arm_ami_type" {
-  description = "AMI type for arm deployment"
-  type = string
-}
-
-variable "x86_ami_type" {
-  description = "AMI type for x86 deployment"
-  type = string
 }
 
 variable "create_vpc_endpoints_in_existing_vpc" {
@@ -339,6 +280,12 @@ variable "ecrMiddlewareRepository" {
 variable "rds_instance_class" {
   type        = string
   description = "The instance class for the RDS database"
+}
+
+variable "rds_multi_az" {
+  type        = bool
+  default     = true
+  description = "Whether the RDS database is deployed Multi-AZ"
 }
 
 variable "rds_allocated_storage" {
@@ -380,4 +327,78 @@ variable "langfuse_host" {
   type    = string
   description = "the hostname of your langfuse deployment. Optional, defaults to https://cloud.langfuse.com"
   default = "https://cloud.langfuse.com"
+}
+
+variable "cloudfront_vpc_origin" {
+  description = "Reach the ALB through a CloudFront VPC origin: the ALB becomes internal (private subnets) and only CloudFront can reach it, over the AWS network"
+  type        = bool
+  default     = true
+}
+
+variable "cloudfront_certificate_arn" {
+  description = "ACM certificate in us-east-1 for the CloudFront custom domain. When empty: created by the stack if certificate_arn is also empty, otherwise falls back to certificate_arn (only valid if the stack is in us-east-1)"
+  type        = string
+  default     = ""
+}
+
+variable "cloudfront_waf" {
+  description = "Attach a CLOUDFRONT-scope web ACL to the distribution. Behind a VPC origin it replaces the regional ACL on the ALB"
+  type        = bool
+  default     = true
+}
+
+variable "cloudfront_waf_rate_limit" {
+  description = "Requests per 5 minutes from one IP before the edge WAF blocks it"
+  type        = number
+  default     = 2000
+}
+
+variable "alarm_email" {
+  description = "Recipient of the Bedrock budget and token alarms. Empty = no alarms"
+  type        = string
+  default     = ""
+}
+
+variable "bedrock_monthly_budget_usd" {
+  description = "Monthly Bedrock budget in USD (notifications at 50/80/100% actual and 100% forecast)"
+  type        = number
+  default     = 100
+}
+
+variable "bedrock_tokens_per_hour_alarm" {
+  description = "Bedrock input + output tokens in one hour that raise the near-real-time alarm"
+  type        = number
+  default     = 2000000
+}
+
+variable "bedrock_budget_services" {
+  description = "Cost Explorer service names that make up Bedrock spend. Anthropic models bill as their own '... (Amazon Bedrock Edition)' service; smoke test X1 flags any that are missing"
+  type        = list(string)
+  default = [
+    "Amazon Bedrock",
+    "Claude Haiku 4.5 (Amazon Bedrock Edition)",
+    "Claude Haiku 5.5 (Amazon Bedrock Edition)",
+    "Claude Sonnet 4.5 (Amazon Bedrock Edition)",
+    "Claude Sonnet 4.6 (Amazon Bedrock Edition)",
+    "Claude Sonnet 5 (Amazon Bedrock Edition)",
+    "Claude Sonnet 5.5 (Amazon Bedrock Edition)",
+    "Claude Opus 4.5 (Amazon Bedrock Edition)",
+    "Claude Opus 4.6 (Amazon Bedrock Edition)",
+    "Claude Opus 5 (Amazon Bedrock Edition)",
+    "Claude Opus 5.5 (Amazon Bedrock Edition)",
+    "Claude 3.5 Haiku (Amazon Bedrock Edition)",
+    "Claude 3 Haiku (Amazon Bedrock Edition)",
+  ]
+}
+
+variable "nat_gateway_per_az" {
+  description = "One NAT gateway per AZ (each private subnet egresses through its own AZ) instead of a single shared one"
+  type        = bool
+  default     = false
+}
+
+variable "create_appregistry_application" {
+  description = "Create a Service Catalog AppRegistry application for the solution (only for accounts that already use AppRegistry; it is closed to new customers)"
+  type        = bool
+  default     = false
 }

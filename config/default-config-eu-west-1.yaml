@@ -1,13 +1,5 @@
 model_list:
 #Bedrock Models
-  - model_name: amazon.titan-text-lite-v1
-    litellm_params:
-      model: bedrock/amazon.titan-text-lite-v1
-
-  - model_name: amazon.titan-text-express-v1
-    litellm_params:
-      model: bedrock/amazon.titan-text-express-v1
-
   - model_name: amazon.titan-embed-image-v1
     litellm_params:
       model: bedrock/amazon.titan-embed-image-v1
@@ -17,14 +9,6 @@ model_list:
     litellm_params:
       model: bedrock/amazon.titan-embed-text-v2:0
       drop_params: true #Needed to avoid errors when encoding_format is passed in by openai python client
-
-  - model_name: amazon.titan-image-generator-v1
-    litellm_params:
-      model: bedrock/amazon.titan-image-generator-v1
-
-  - model_name: anthropic.claude-3-haiku-20240307-v1:0
-    litellm_params:
-      model: bedrock/anthropic.claude-3-haiku-20240307-v1:0
 
   - model_name: cohere.embed-english-v3
     litellm_params:
@@ -47,18 +31,6 @@ model_list:
     litellm_params:
       model: bedrock/mistral.mistral-large-2402-v1:0
 
-  - model_name: eu.anthropic.claude-3-sonnet-20240229-v1:0
-    litellm_params:
-      model: bedrock/eu.anthropic.claude-3-sonnet-20240229-v1:0
-
-  - model_name: eu.anthropic.claude-3-haiku-20240307-v1:0
-    litellm_params:
-      model: bedrock/eu.anthropic.claude-3-haiku-20240307-v1:0
-
-  - model_name: eu.anthropic.claude-3-5-sonnet-20240620-v1:0
-    litellm_params:
-      model: bedrock/eu.anthropic.claude-3-5-sonnet-20240620-v1:0
-
   - model_name: eu.meta.llama3-2-3b-instruct-v1:0
     litellm_params:
       model: bedrock/eu.meta.llama3-2-3b-instruct-v1:0
@@ -67,3 +39,53 @@ model_list:
     litellm_params:
       model: bedrock/eu.meta.llama3-2-1b-instruct-v1:0
 
+
+#Current-generation models via EU cross-region inference profiles
+  - model_name: eu.anthropic.claude-haiku-4-5-20251001-v1:0
+    litellm_params:
+      model: bedrock/eu.anthropic.claude-haiku-4-5-20251001-v1:0
+
+  - model_name: eu.anthropic.claude-sonnet-4-6
+    litellm_params:
+      model: bedrock/eu.anthropic.claude-sonnet-4-6
+
+  - model_name: eu.anthropic.claude-haiku-5-5
+    litellm_params:
+      model: bedrock/eu.anthropic.claude-haiku-5-5
+
+  - model_name: eu.anthropic.claude-sonnet-5-5
+    litellm_params:
+      model: bedrock/eu.anthropic.claude-sonnet-5-5
+
+  - model_name: eu.anthropic.claude-opus-5-5
+    litellm_params:
+      model: bedrock/eu.anthropic.claude-opus-5-5
+
+  - model_name: eu.amazon.nova-micro-v1:0
+    litellm_params:
+      model: bedrock/eu.amazon.nova-micro-v1:0
+
+  - model_name: eu.amazon.nova-lite-v1:0
+    litellm_params:
+      model: bedrock/eu.amazon.nova-lite-v1:0
+
+  - model_name: eu.amazon.nova-pro-v1:0
+    litellm_params:
+      model: bedrock/eu.amazon.nova-pro-v1:0
+
+  - model_name: eu.cohere.embed-v4:0
+    litellm_params:
+      model: bedrock/eu.cohere.embed-v4:0
+      drop_params: true #Needed to avoid errors when encoding_format is passed in by openai python client
+
+  - model_name: eu.anthropic.claude-sonnet-5
+    litellm_params:
+      model: bedrock/eu.anthropic.claude-sonnet-5
+
+  - model_name: eu.anthropic.claude-opus-5
+    litellm_params:
+      model: bedrock/eu.anthropic.claude-opus-5
+
+  - model_name: eu.amazon.nova-2-lite-v1:0
+    litellm_params:
+      model: bedrock/eu.amazon.nova-2-lite-v1:0

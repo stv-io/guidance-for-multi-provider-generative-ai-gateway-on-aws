@@ -24,12 +24,21 @@ if [ ! -f "config/config.yaml" ]; then
     exit 1
   fi
   
-  echo "Merging $base_config with $region_config for region $aws_region"
-  
-  # Extract model lists from both files and combine them
-  yq eval-all '
-    select(fileIndex == 0).model_list + select(fileIndex == 1).model_list
-  ' "$base_config" "$region_config" > "config/combined_models.yaml"
+  # .env is not sourced yet at this point, so read the flag directly (defaults to true)
+  include_base_models=$(sed -n 's/^INCLUDE_BASE_MODELS="\{0,1\}\([a-z]*\)"\{0,1\}.*/\1/p' .env 2>/dev/null | tail -n 1)
+  include_base_models=${include_base_models:-true}
+
+  if [ "$include_base_models" = "true" ]; then
+    echo "Merging $base_config with $region_config for region $aws_region"
+
+    # Extract model lists from both files and combine them
+    yq eval-all '
+      select(fileIndex == 0).model_list + select(fileIndex == 1).model_list
+    ' "$base_config" "$region_config" > "config/combined_models.yaml"
+  else
+    echo "INCLUDE_BASE_MODELS=false: using only the $aws_region Bedrock models from $region_config"
+    yq eval '.model_list' "$region_config" > "config/combined_models.yaml"
+  fi
   
   # Get the base config without model_list
   yq eval 'del(.model_list)' "$base_config" > "config/config.yaml.tmp"
@@ -68,6 +77,25 @@ MAIN_STACK_NAME="litellm-stack"
 TRACKING_STACK_NAME="tracking-stack"
 # Load environment variables from .env file
 source .env
+STACK_ENV=${STACK_ENV:-}
+AUTO_APPROVE=${AUTO_APPROVE:-false}
+
+# Plan, show it, and apply only that plan: on AUTO_APPROVE=true, or after confirmation on a terminal
+tf_plan_apply() {
+    terraform plan -input=false -out=tfplan "$@"
+    if [ "$AUTO_APPROVE" = "true" ]; then
+        :
+    elif [ -t 0 ]; then
+        read -r -p "Apply this plan? [y/N] " answer
+        [ "$answer" = "y" ] || { echo "Aborted; nothing applied."; rm -f tfplan; exit 1; }
+    else
+        echo "Not running on a terminal and AUTO_APPROVE is not true: stopping after plan."
+        rm -f tfplan
+        exit 1
+    fi
+    terraform apply -input=false tfplan
+    rm -f tfplan
+}
 
 # Auto-detect existing deployments and set defaults for backward compatibility
 if aws cloudformation describe-stacks --stack-name "${TRACKING_STACK_NAME}" &>/dev/null; then
@@ -144,54 +172,48 @@ echo "LiteLLM Version: " $LITELLM_VERSION
 echo "Skipping container build: " $SKIP_BUILD
 echo "Build from source: " $BUILD_FROM_SOURCE
 
-echo "OPENAI_API_KEY: $OPENAI_API_KEY"
-echo "AZURE_OPENAI_API_KEY: $AZURE_OPENAI_API_KEY"
-echo "AZURE_API_KEY: $AZURE_API_KEY"
-echo "ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY"
-echo "GROQ_API_KEY: $GROQ_API_KEY"
-echo "COHERE_API_KEY: $COHERE_API_KEY"
-echo "CO_API_KEY: $CO_API_KEY"
-echo "HF_TOKEN: $HF_TOKEN"
-echo "HUGGINGFACE_API_KEY: $HUGGINGFACE_API_KEY"
-echo "DATABRICKS_API_KEY: $DATABRICKS_API_KEY"
-echo "GEMINI_API_KEY: $GEMINI_API_KEY"
-echo "CODESTRAL_API_KEY: $CODESTRAL_API_KEY"
-echo "MISTRAL_API_KEY: $MISTRAL_API_KEY"
-echo "AZURE_AI_API_KEY: $AZURE_AI_API_KEY"
-echo "NVIDIA_NIM_API_KEY: $NVIDIA_NIM_API_KEY"
-echo "XAI_API_KEY: $XAI_API_KEY"
-echo "PERPLEXITYAI_API_KEY: $PERPLEXITYAI_API_KEY"
-echo "GITHUB_API_KEY: $GITHUB_API_KEY"
-echo "DEEPSEEK_API_KEY: $DEEPSEEK_API_KEY"
-echo "AI21_API_KEY: $AI21_API_KEY"
-echo "LANGSMITH_API_KEY: $LANGSMITH_API_KEY"
+echo "OPENAI_API_KEY: ${OPENAI_API_KEY:+<set>}"
+echo "AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:+<set>}"
+echo "AZURE_API_KEY: ${AZURE_API_KEY:+<set>}"
+echo "ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:+<set>}"
+echo "GROQ_API_KEY: ${GROQ_API_KEY:+<set>}"
+echo "COHERE_API_KEY: ${COHERE_API_KEY:+<set>}"
+echo "CO_API_KEY: ${CO_API_KEY:+<set>}"
+echo "HF_TOKEN: ${HF_TOKEN:+<set>}"
+echo "HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY:+<set>}"
+echo "DATABRICKS_API_KEY: ${DATABRICKS_API_KEY:+<set>}"
+echo "GEMINI_API_KEY: ${GEMINI_API_KEY:+<set>}"
+echo "CODESTRAL_API_KEY: ${CODESTRAL_API_KEY:+<set>}"
+echo "MISTRAL_API_KEY: ${MISTRAL_API_KEY:+<set>}"
+echo "AZURE_AI_API_KEY: ${AZURE_AI_API_KEY:+<set>}"
+echo "NVIDIA_NIM_API_KEY: ${NVIDIA_NIM_API_KEY:+<set>}"
+echo "XAI_API_KEY: ${XAI_API_KEY:+<set>}"
+echo "PERPLEXITYAI_API_KEY: ${PERPLEXITYAI_API_KEY:+<set>}"
+echo "GITHUB_API_KEY: ${GITHUB_API_KEY:+<set>}"
+echo "DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:+<set>}"
+echo "AI21_API_KEY: ${AI21_API_KEY:+<set>}"
+echo "LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:+<set>}"
 echo "LANGSMITH_PROJECT: $LANGSMITH_PROJECT"
 echo "LANGSMITH_DEFAULT_RUN_NAME: $LANGSMITH_DEFAULT_RUN_NAME"
-echo "DEPLOYMENT_PLATFORM: $DEPLOYMENT_PLATFORM"
-echo "EXISTING_EKS_CLUSTER_NAME: $EXISTING_EKS_CLUSTER_NAME"
 echo "EXISTING_VPC_ID: $EXISTING_VPC_ID"
 echo "DISABLE_OUTBOUND_NETWORK_ACCESS: $DISABLE_OUTBOUND_NETWORK_ACCESS"
 echo "CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC: $CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC"
-echo "INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER: $INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER"
 echo "DESIRED_CAPACITY: $DESIRED_CAPACITY"
 echo "MIN_CAPACITY: $MIN_CAPACITY"
 echo "MAX_CAPACITY: $MAX_CAPACITY"
 echo "ECS_CPU_TARGET_UTILIZATION_PERCENTAGE: $ECS_CPU_TARGET_UTILIZATION_PERCENTAGE"
 echo "ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE: $ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE"
 echo "ECS_VCPUS: $ECS_VCPUS"
-echo "EKS_ARM_INSTANCE_TYPE: $EKS_ARM_INSTANCE_TYPE"
-echo "EKS_X86_INSTANCE_TYPE: $EKS_X86_INSTANCE_TYPE"
-echo "EKS_ARM_AMI_TYPE: $EKS_ARM_AMI_TYPE"
-echo "EKS_X86_AMI_TYPE: $EKS_X86_AMI_TYPE"
 echo "PUBLIC_LOAD_BALANCER: $PUBLIC_LOAD_BALANCER"
 echo "RDS_INSTANCE_CLASS: $RDS_INSTANCE_CLASS"
 echo "RDS_ALLOCATED_STORAGE_GB: $RDS_ALLOCATED_STORAGE_GB"
+echo "RDS_MULTI_AZ: ${RDS_MULTI_AZ:-true}"
 echo "REDIS_NODE_TYPE: $REDIS_NODE_TYPE"
 echo "REDIS_NUM_CACHE_CLUSTERS: $REDIS_NUM_CACHE_CLUSTERS"
 echo "DISABLE_SWAGGER_PAGE: $DISABLE_SWAGGER_PAGE"
 echo "DISABLE_ADMIN_UI: $DISABLE_ADMIN_UI"
 echo "LANGFUSE_PUBLIC_KEY: $LANGFUSE_PUBLIC_KEY"
-echo "LANGFUSE_SECRET_KEY: $LANGFUSE_SECRET_KEY"
+echo "LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:+<set>}"
 echo "LANGFUSE_HOST: $LANGFUSE_HOST"
 
 if [ -n "$CPU_ARCHITECTURE" ]; then
@@ -242,14 +264,14 @@ export TF_VAR_name=$LOG_BUCKET_STACK_NAME
 
 cat > backend.hcl << EOF
 bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
-key     = "terraform-log-bucket.tfstate"
+key     = "${STACK_ENV:+${STACK_ENV}/}terraform-log-bucket.tfstate"
 region  = "${aws_region}"
 encrypt = true
 EOF
 echo "Generated backend.hcl configuration"
 
 terraform init -backend-config=backend.hcl
-terraform apply -auto-approve
+tf_plan_apply
 
 if [ $? -eq 0 ]; then
     echo "Log Bucket Deployment successful. Extracting outputs..."
@@ -307,10 +329,15 @@ if [ -n "${LANGFUSE_PUBLIC_KEY}" ] && [ -n "${LANGFUSE_SECRET_KEY}" ]; then
     echo "Updated config.yaml with 'langfuse' added to success callback array"
 fi
 
+# Response cache TTL: without one, cached entries are never evicted (volatile-lru) and fill Valkey
+if yq e '.litellm_settings.cache_params' config/config.yaml | grep -q "^[^#n]"; then
+    yq e ".litellm_settings.cache_params.ttl = ${LITELLM_CACHE_TTL_SECONDS:-3600}" -i config/config.yaml
+    echo "Set response cache TTL to ${LITELLM_CACHE_TTL_SECONDS:-3600}s"
+fi
+
 echo "Deploying litellm-terraform-stack"
 cd litellm-terraform-stack
 
-export TF_VAR_deployment_platform=$DEPLOYMENT_PLATFORM
 export TF_VAR_name=$MAIN_STACK_NAME
 export TF_VAR_vpc_id=$EXISTING_VPC_ID
 export TF_VAR_log_bucket_arn=$LOG_BUCKET_ARN
@@ -320,7 +347,6 @@ export TF_VAR_azure_openai_api_key=$AZURE_OPENAI_API_KEY
 export TF_VAR_azure_api_key=$AZURE_API_KEY
 export TF_VAR_anthropic_api_key=$ANTHROPIC_API_KEY
 export TF_VAR_public_load_balancer=$PUBLIC_LOAD_BALANCER
-export TF_VAR_existing_cluster_name=$EXISTING_EKS_CLUSTER_NAME
 export TF_VAR_groq_api_key=$GROQ_API_KEY
 export TF_VAR_cohere_api_key=$COHERE_API_KEY
 export TF_VAR_co_api_key=$CO_API_KEY
@@ -354,16 +380,12 @@ export TF_VAR_max_capacity=$MAX_CAPACITY
 export TF_VAR_cpu_target_utilization_percent=$ECS_CPU_TARGET_UTILIZATION_PERCENTAGE
 export TF_VAR_memory_target_utilization_percent=$ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE
 export TF_VAR_vcpus=$ECS_VCPUS
-export TF_VAR_install_add_ons_in_existing_eks_cluster=$INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER
-export TF_VAR_arm_instance_type=$EKS_ARM_INSTANCE_TYPE
-export TF_VAR_x86_instance_type=$EKS_X86_INSTANCE_TYPE
-export TF_VAR_arm_ami_type=$EKS_ARM_AMI_TYPE
-export TF_VAR_x86_ami_type=$EKS_X86_AMI_TYPE
 export TF_VAR_create_vpc_endpoints_in_existing_vpc=$CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC
 export TF_VAR_ecrLitellmRepository=$APP_NAME
 export TF_VAR_ecrMiddlewareRepository=$MIDDLEWARE_APP_NAME
 export TF_VAR_rds_instance_class=$RDS_INSTANCE_CLASS
 export TF_VAR_rds_allocated_storage=$RDS_ALLOCATED_STORAGE_GB
+export TF_VAR_rds_multi_az=${RDS_MULTI_AZ:-true}
 export TF_VAR_redis_node_type=$REDIS_NODE_TYPE
 export TF_VAR_redis_num_cache_clusters=$REDIS_NUM_CACHE_CLUSTERS
 export TF_VAR_disable_swagger_page=$DISABLE_SWAGGER_PAGE
@@ -373,6 +395,14 @@ export TF_VAR_langfuse_secret_key=$LANGFUSE_SECRET_KEY
 export TF_VAR_use_route53=$USE_ROUTE53
 export TF_VAR_use_cloudfront=$USE_CLOUDFRONT
 export TF_VAR_cloudfront_price_class=$CLOUDFRONT_PRICE_CLASS
+export TF_VAR_cloudfront_vpc_origin=${CLOUDFRONT_VPC_ORIGIN:-true}
+export TF_VAR_cloudfront_certificate_arn=${CLOUDFRONT_CERTIFICATE_ARN:-}
+export TF_VAR_cloudfront_waf=${CLOUDFRONT_WAF:-true}
+export TF_VAR_cloudfront_waf_rate_limit=${CLOUDFRONT_WAF_RATE_LIMIT:-2000}
+export TF_VAR_nat_gateway_per_az=${NAT_GATEWAY_PER_AZ:-false}
+export TF_VAR_alarm_email=${ALARM_EMAIL:-}
+export TF_VAR_bedrock_monthly_budget_usd=${BEDROCK_MONTHLY_BUDGET_USD:-100}
+export TF_VAR_bedrock_tokens_per_hour_alarm=${BEDROCK_TOKENS_PER_HOUR_ALARM:-2000000}
 
 # Display CloudFront and Route53 configuration
 echo "USE_ROUTE53: $USE_ROUTE53"
@@ -383,54 +413,32 @@ if [ -n "${LANGFUSE_HOST}" ]; then
     export TF_VAR_langfuse_host=$LANGFUSE_HOST
 fi
 
-if [ -n "$EXISTING_EKS_CLUSTER_NAME" ]; then
-    export TF_VAR_create_cluster="false"
-else
-    export TF_VAR_create_cluster="true"
-fi
-
 cat > backend.hcl << EOF
 bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
-key     = "terraform-unified.tfstate"
+key     = "${STACK_ENV:+${STACK_ENV}/}terraform-unified.tfstate"
 region  = "${aws_region}"
 encrypt = true
 EOF
 echo "Generated backend.hcl configuration"
 
 terraform init -backend-config=backend.hcl
-if [ -z "$EXISTING_VPC_ID" ] && [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
-    echo "Deploying base of terraform first for case of new vpc and eks"
-    terraform apply -target=module.base -auto-approve
-fi
-terraform apply -auto-approve
+tf_plan_apply
 
 if [ $? -eq 0 ]; then
     echo "Deployment successful. Extracting outputs..."
     
-    if [ "$DEPLOYMENT_PLATFORM" = "ECS" ]; then
-        LITELLM_ECS_CLUSTER=$(terraform output -raw LitellmEcsCluster)
-        LITELLM_ECS_TASK=$(terraform output -raw LitellmEcsTask)
-        SERVICE_URL=$(terraform output -raw ServiceURL)
+    LITELLM_ECS_CLUSTER=$(terraform output -raw LitellmEcsCluster)
+    LITELLM_ECS_TASK=$(terraform output -raw LitellmEcsTask)
+    SERVICE_URL=$(terraform output -raw ServiceURL)
 
-        echo "ServiceURL=$SERVICE_URL" > resources.txt
-        aws ecs update-service \
-            --cluster $LITELLM_ECS_CLUSTER \
-            --service $LITELLM_ECS_TASK \
-            --force-new-deployment \
-            --desired-count $DESIRED_CAPACITY \
-            --no-cli-pager
-    fi
+    echo "ServiceURL=$SERVICE_URL" > resources.txt
+    aws ecs update-service \
+        --cluster $LITELLM_ECS_CLUSTER \
+        --service $LITELLM_ECS_TASK \
+        --force-new-deployment \
+        --desired-count $DESIRED_CAPACITY \
+        --no-cli-pager
 
-    if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
-        EKS_CLUSTER_NAME=$(terraform output -raw eks_cluster_name)
-        EKS_DEPLOYMENT_NAME=$(terraform output -raw eks_deployment_name)
-
-        echo "EKS_DEPLOYMENT_NAME: $EKS_DEPLOYMENT_NAME"
-        echo "EKS_CLUSTER_NAME: $EKS_CLUSTER_NAME"
-        aws eks update-kubeconfig --region $aws_region --name $EKS_CLUSTER_NAME
-        kubectl rollout restart deployment $EKS_DEPLOYMENT_NAME
-    fi
-    
     # Validate CloudFront if enabled
     if [ "$USE_CLOUDFRONT" = "true" ]; then
         echo "Validating CloudFront deployment..."

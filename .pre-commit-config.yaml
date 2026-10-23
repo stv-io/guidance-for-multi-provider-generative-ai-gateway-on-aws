@@ -1,0 +1,55 @@
+# pre-commit hooks. Install once per clone:
+#   pre-commit install
+# Run against staged files on every commit, or on demand:
+#   pre-commit run                 # staged files
+#   pre-commit run --files <path>  # specific files
+#
+# The terraform_fmt hook needs a local `terraform` binary on PATH.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-merge-conflict
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-toml
+      - id: check-json
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+
+  # Ruff picks up the nearest pyproject.toml: middleware/ has its own config,
+  # everything else uses the root one (including its extend-exclude list).
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.1
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  # Keep both uv.lock files in sync with their pyproject.toml.
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.13.5
+    hooks:
+      - id: uv-lock
+        name: uv-lock (root)
+      - id: uv-lock
+        name: uv-lock (middleware)
+        args: [--project, middleware]
+        files: ^middleware/(pyproject\.toml|uv\.lock)$
+
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.109.3
+    hooks:
+      - id: terraform_fmt
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks

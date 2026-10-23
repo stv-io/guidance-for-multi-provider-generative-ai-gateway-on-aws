@@ -63,6 +63,10 @@ resource "aws_security_group_rule" "db_ingress" {
   description              = "Allow ECS tasks to connect to RDS"
 }
 
+data "aws_ec2_managed_prefix_list" "cloudfront_origin_facing" {
+  name = "com.amazonaws.global.cloudfront.origin-facing"
+}
+
 resource "aws_security_group" "alb_sg" {
   name        = "${var.name}-alb-sg"
   description = "Security group for ALB"
@@ -73,27 +77,33 @@ resource "aws_security_group" "alb_sg" {
   # 1. When CloudFront is enabled: Custom origin header authentication via ALB listener rules
   # 2. When CloudFront is disabled: WAF rules on the ALB
   # 3. When private: Only accessible from private subnets
-  ingress {
-    description = "HTTPS traffic"
-    protocol    = "tcp"
-    from_port   = 443
-    to_port     = 443
-    cidr_blocks = var.public_load_balancer ? ["0.0.0.0/0"] : var.private_subnets_cidr_blocks
+  dynamic "ingress" {
+    for_each = local.use_vpc_origin ? [] : [443, 80]
+    content {
+      description = ingress.value == 443 ? "HTTPS traffic" : "HTTP traffic for CloudFront origin (custom header authentication)"
+      protocol    = "tcp"
+      from_port   = ingress.value
+      to_port     = ingress.value
+      cidr_blocks = var.public_load_balancer ? ["0.0.0.0/0"] : var.private_subnets_cidr_blocks
+    }
   }
-  
-  # Add HTTP ingress for CloudFront origin connections
-  # Security for HTTP is provided by custom header authentication
-  ingress {
-    description = "HTTP traffic for CloudFront origin"
-    protocol    = "tcp"
-    from_port   = 80
-    to_port     = 80
-    cidr_blocks = var.public_load_balancer ? ["0.0.0.0/0"] : var.private_subnets_cidr_blocks
+
+  # VPC origin: only CloudFront origin-facing addresses. One 80-443 rule because the managed
+  # prefix list counts as ~55 entries against the 60-rule security group quota.
+  dynamic "ingress" {
+    for_each = local.use_vpc_origin ? [1] : []
+    content {
+      description     = "CloudFront VPC origin (HTTP 80 / HTTPS 443)"
+      protocol        = "tcp"
+      from_port       = 80
+      to_port         = 443
+      prefix_list_ids = [data.aws_ec2_managed_prefix_list.cloudfront_origin_facing.id]
+    }
   }
 
   tags = {
     Name = "${var.name}-alb-sg"
-    SecurityModel = var.use_cloudfront ? "CloudFront-Protected" : (var.public_load_balancer ? "Public-WAF-Protected" : "Private-VPC-Only")
+    SecurityModel = local.use_vpc_origin ? "CloudFront-VPC-Origin" : var.use_cloudfront ? "CloudFront-Protected" : (var.public_load_balancer ? "Public-WAF-Protected" : "Private-VPC-Only")
   }
 
   # Allow all outbound

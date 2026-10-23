@@ -1,11 +1,24 @@
 terraform {
+  required_version = ">= 1.6"
   backend "s3" {}
   required_providers {
-      helm = {
-        source  = "hashicorp/helm"
-        version = "~> 2.0"
-      }
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.9"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.4"
+    }
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.14"
+    }
+  }
 }
 
 data "aws_caller_identity" "current" {}
@@ -30,8 +43,20 @@ provider "aws" {
   }
 }
 
+# CloudFront only accepts certificates and web ACLs from us-east-1
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+  default_tags {
+    tags = local.common_labels
+  }
+}
+
+# AppRegistry closed to new customers on 2026-07-30 (CreateApplication returns AccessDenied),
+# so it is opt-in for accounts that already use it.
 resource "aws_servicecatalogappregistry_application" "solution_application" {
-  name        = "${local.SolutionNameKeySatisfyingRestrictions}-${data.aws_region.current.name}-${data.aws_caller_identity.current.account_id}"
+  count       = var.create_appregistry_application ? 1 : 0
+  name        = "${local.SolutionNameKeySatisfyingRestrictions}-${data.aws_region.current.region}-${data.aws_caller_identity.current.account_id}"
   description = "Service Catalog application to track and manage all your resources for the solution ${local.common_labels.SolutionNameKey}"
 
   tags = {
@@ -39,26 +64,5 @@ resource "aws_servicecatalogappregistry_application" "solution_application" {
     "Solutions:SolutionName"    = local.common_labels.SolutionNameKey
     "Solutions:SolutionVersion" = local.common_labels.SolutionVersionKey
     "Solutions:ApplicationType" = "AWS-Solutions"
-  }
-}
-
-
-
-data "aws_eks_cluster_auth" "cluster" {
-  count = local.platform == "EKS" ? 1 : 0
-  name = module.eks_cluster[0].cluster_name
-}
-
-provider "kubernetes" {
-  host                   = local.platform == "EKS" ? module.eks_cluster[0].cluster_endpoint : ""
-  cluster_ca_certificate = local.platform == "EKS" ? base64decode(module.eks_cluster[0].cluster_ca) : ""
-  token = local.platform == "EKS" ? data.aws_eks_cluster_auth.cluster[0].token : ""
-}
-
-provider "helm" {
-  kubernetes {
-    host                   = local.platform == "EKS" ? module.eks_cluster[0].cluster_endpoint : ""
-    cluster_ca_certificate = local.platform == "EKS" ? base64decode(module.eks_cluster[0].cluster_ca) : ""
-    token = local.platform == "EKS" ? data.aws_eks_cluster_auth.cluster[0].token : ""
   }
 }

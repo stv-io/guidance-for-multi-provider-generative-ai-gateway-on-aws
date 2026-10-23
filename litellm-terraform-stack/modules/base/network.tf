@@ -17,17 +17,17 @@ resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.new[0].id
 }
 
-# Create the NAT gateway only if nat_gateway_count = 1 (and we have a new VPC).
-# We'll put it in the first public subnet for simplicity.
+# NAT gateways for a new VPC: none (outbound disabled), one shared in the first public subnet, or
+# one per AZ (nat_gateway_per_az) so that losing an AZ does not cut the other AZ's egress.
 resource "aws_eip" "nat" {
-  count = (local.creating_new_vpc && local.nat_gateway_count == 1) ? 1 : 0
+  count  = local.creating_new_vpc ? local.nat_gateway_count : 0
   domain = "vpc"
 }
 
 resource "aws_nat_gateway" "this" {
-  count         = (local.creating_new_vpc && local.nat_gateway_count == 1) ? 1 : 0
-  allocation_id = aws_eip.nat[0].id
-  subnet_id     = aws_subnet.public[0].id
+  count         = local.creating_new_vpc ? local.nat_gateway_count : 0
+  allocation_id = aws_eip.nat[count.index].id
+  subnet_id     = aws_subnet.public[count.index].id
   depends_on    = [aws_internet_gateway.this]
 }
 
@@ -57,13 +57,14 @@ resource "aws_route_table" "public" {
   }
 }
 
+# One private route table per NAT gateway
 resource "aws_route_table" "private_with_nat" {
-  count  = local.creating_new_vpc && (local.nat_gateway_count == 1) ? 1 : 0
+  count  = local.creating_new_vpc ? local.nat_gateway_count : 0
   vpc_id = aws_vpc.new[0].id
 
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.this[0].id
+    nat_gateway_id = aws_nat_gateway.this[count.index].id
   }
   lifecycle {
     ignore_changes = [route]
@@ -89,7 +90,8 @@ resource "aws_route_table_association" "public" {
 resource "aws_route_table_association" "private" {
   count = local.creating_new_vpc ? length(aws_subnet.private) : 0
   subnet_id      = aws_subnet.private[count.index].id
-  route_table_id = local.nat_gateway_count == 1 ? aws_route_table.private_with_nat[0].id : aws_route_table.private_isolated[0].id
+  # With one NAT per AZ, each private subnet uses the NAT in its own AZ
+  route_table_id = local.nat_gateway_count >= 1 ? aws_route_table.private_with_nat[min(count.index, max(local.nat_gateway_count, 1) - 1)].id : aws_route_table.private_isolated[0].id
 }
 
 # Data source for availability_zones
@@ -101,7 +103,7 @@ data "aws_availability_zones" "available" {
 resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
   count             = local.creating_new_vpc ? 1 : 0
   name_prefix              = "/aws/vpc/${var.name}-flow-logs"
-  retention_in_days = 365
+  retention_in_days = 14
 }
 
 resource "aws_flow_log" "this" {
@@ -110,8 +112,8 @@ resource "aws_flow_log" "this" {
   log_destination_type = "cloud-watch-logs"
   vpc_id               = aws_vpc.new[0].id
   iam_role_arn         = aws_iam_role.vpc_flow_logs_role[0].arn
-  traffic_type         = "ALL"
-  max_aggregation_interval = 60
+  traffic_type         = "REJECT"
+  max_aggregation_interval = 600
 }
 
 data "aws_subnets" "existing_all" {

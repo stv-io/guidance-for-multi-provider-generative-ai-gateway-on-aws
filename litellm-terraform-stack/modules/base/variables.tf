@@ -19,16 +19,6 @@ variable "ecrMiddlewareRepository" {
   description = "Name of the Middleware ECR repository"
 }
 
-variable "deployment_platform" {
-  description = "Which platform to deploy (ECS or EKS)"
-  type        = string
-  
-  validation {
-    condition     = can(regex("^(ECS|EKS)$", upper(var.deployment_platform)))
-    error_message = "DEPLOYMENT_PLATFORM must be either 'ECS' or 'EKS' (case insensitive)."
-  }
-}
-
 variable "disable_outbound_network_access" {
     description = "Whether to disable outbound network access"
     type = bool
@@ -60,6 +50,12 @@ variable "rds_instance_class" {
   description = "The instance class for the RDS database"
 }
 
+variable "rds_multi_az" {
+  type        = bool
+  default     = true
+  description = "Whether the RDS database is deployed Multi-AZ"
+}
+
 variable "rds_allocated_storage" {
   type        = number
   description = "The allocated storage in GB for the RDS database"
@@ -77,6 +73,18 @@ variable "redis_num_cache_clusters" {
 
 variable "use_route53" {
   description = "Whether to use Route53 for DNS management. If false, no Route53 resources will be created."
+  type        = bool
+  default     = false
+}
+
+variable "create_regional_waf" {
+  description = "Create the REGIONAL web ACL for the ALB (not needed when an edge ACL covers all traffic)"
+  type        = bool
+  default     = true
+}
+
+variable "nat_gateway_per_az" {
+  description = "One NAT gateway per AZ instead of a single shared one"
   type        = bool
   default     = false
 }
