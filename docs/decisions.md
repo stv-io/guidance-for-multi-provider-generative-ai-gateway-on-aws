@@ -14,7 +14,16 @@ or tests. Test IDs refer to [`validation/README.md`](../validation/README.md).
 | D5 | Autoscale on CPU only; the memory policy is optional and off | LiteLLM idles at about 45% of a 2 GB task, and target tracking assumes memory falls when a task is removed, so any memory target kept an extra task running | `ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE=0`, `alb.tf` |
 | D6 | Keep the shared response cache, with a 1-hour TTL; LiteLLM debug logging off | Without a TTL, `volatile-lru` can't evict cache entries and they crowd out the rate-limit state. Debug logging can write prompts to the logs. Clients opt out per request with `"cache": {"no-cache": true}` | `config/default-config-base.yaml`, `LITELLM_CACHE_TTL_SECONDS`; test C1 |
 | — | Key cache TTL 10 s (`general_settings.user_api_key_cache_ttl`) | LiteLLM evicts a deleted key only on the task that handled the delete, so other tasks accepted it for up to 60 s | `default-config-base.yaml`; test K6 |
-| D3 | **Open.** `/user/new` verifies Okta JWTs only; replace with a generic OIDC/JWKS check so Google and other IdPs work | — | `middleware/app.py` |
+
+## Open items (not decided)
+
+Recorded so they aren't lost. Nothing has been chosen for any of them.
+
+| ID | Item | Why it matters | Options to weigh |
+|----|------|----------------|------------------|
+| D3 | Google (or any OIDC) sign-in for `/user/new` | The middleware verifies Okta JWTs only, so self-service user creation doesn't work with Google Workspace or Entra ID | A generic OIDC/JWKS check (issuer, audience, JWKS URL as settings); LiteLLM's own SSO for the Admin UI instead; or drop `/user/new` and issue keys centrally |
+| TODO-1 | Health alarms | The only alarms watch spend; an outage or a full database would go unnoticed | ALB 5xx rate and unhealthy targets, ECS running tasks below desired, RDS CPU, free storage and connections, Valkey memory; all to the existing SNS topic |
+| TODO-2 | LiteLLM upgrade routine | LiteLLM releases almost daily, and the build refuses an image unless `LITELLM_VERSION` and `LITELLM_IMAGE_DIGEST` match and the cosign signature verifies | A monthly manual bump (version + digest, deploy, `smoke.sh`); a Renovate or Dependabot PR that updates both; how far behind latest to stay; who reviews the release notes |
 
 ## Bugs fixed (all present upstream)
 
