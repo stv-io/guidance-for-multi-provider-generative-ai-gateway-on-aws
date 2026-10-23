@@ -252,8 +252,9 @@ variable "cpu_target_utilization_percent" {
 }
 
 variable "memory_target_utilization_percent" {
-  description = "Memory target utilization percent for autoscale"
+  description = "Memory target utilization percent for autoscale; 0 disables memory-based scaling"
   type = number
+  default = 0
 }
 
 variable "vcpus" {

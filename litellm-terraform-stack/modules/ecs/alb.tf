@@ -263,7 +263,11 @@ resource "aws_appautoscaling_policy" "cpu_policy" {
   }
 }
 
+# Memory hardly follows load (LiteLLM idles at ~45% of a 2 GB task), and target
+# tracking assumes it does: at 2 tasks × 45% it computes that 1 task would sit at
+# ~90% and never scales in. 0 disables the policy so CPU alone drives scaling.
 resource "aws_appautoscaling_policy" "memory_policy" {
+  count              = var.memory_target_utilization_percent > 0 ? 1 : 0
   name               = "${var.name}-memory-scaling"
   policy_type        = "TargetTrackingScaling"
   resource_id        = aws_appautoscaling_target.ecs_service_target.resource_id
@@ -278,4 +282,9 @@ resource "aws_appautoscaling_policy" "memory_policy" {
     scale_in_cooldown  = 60
     scale_out_cooldown = 60
   }
+}
+
+moved {
+  from = aws_appautoscaling_policy.memory_policy
+  to   = aws_appautoscaling_policy.memory_policy[0]
 }

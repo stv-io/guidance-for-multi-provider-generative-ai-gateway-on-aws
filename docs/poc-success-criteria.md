@@ -18,7 +18,7 @@ succeeds, it is the next decision.
 | 2 | At least 5 engineers use their own virtual key on at least 10 working days | LiteLLM spend logs per key |
 | 3 | Per-key and per-team spend and budgets are visible and enforced | Admin UI; K4/K5 tests |
 | 4 | The gateway adds less than 300 ms p95 latency over calling Bedrock directly, for non-streaming requests | `scripts/benchmark.py`, run against both |
-| 5 | Infrastructure cost stays under $100/month, excluding Bedrock tokens | Cost Explorer filtered by tag `project=llmgateway` |
+| 5 | Infrastructure cost stays under $100/month, excluding Bedrock tokens | Cost Explorer for the sandbox account, grouped by service, excluding Bedrock and credits. The sandbox is a linked account, so cost-allocation tags such as `project=llmgateway` can't be activated there; they would have to be activated in the management account |
 | 6 | No secrets in logs and no unauthenticated access paths | S1, E1, A1/A2 tests; review of the CloudFront → ALB path |
 
 ## Exit criteria: when to stop using LiteLLM
@@ -40,9 +40,10 @@ These block a customer pilot, not the internal PoC:
 
 - ~~Only admins can create keys through `/key/generate`.~~ Done: middleware gate, test K7.
 - ~~CloudFront reaches the ALB over a private path, not plain HTTP on the internet.~~
-  Done: VPC origin with an internal ALB (`CLOUDFRONT_VPC_ORIGIN=true`), test E1.
-  HTTPS on that hop (ALB certificate that matches the origin name) is still to validate.
-- The deployment runs in its own account, on its own domain, with ACM
-  certificates in the stack region (ALB) and in us-east-1 (CloudFront).
+  Done: VPC origin with an internal ALB (`CLOUDFRONT_VPC_ORIGIN=true`) over HTTPS with a
+  certificate for the custom domain; tests E1 and E6.
+- ~~Own domain with ACM certificates in the stack region (ALB) and in us-east-1
+  (CloudFront).~~ Done: the stack requests and DNS-validates both; test E7. Edge WAF: test E8.
+- The production deployment runs in its own AWS account.
 - Chat-history retention, data-processing terms and Bedrock invocation logging
   are agreed.

@@ -87,6 +87,8 @@ so the environments never share state even if they share a bucket.
 | `REDIS_NUM_CACHE_CLUSTERS` | `2` (sandbox `1`) | >1 turns on Multi-AZ and automatic failover |
 | `INCLUDE_BASE_MODELS` | `true` (profiles `false`) | `false` loads only the region's Bedrock models, not the ~90 third-party entries in `default-config-base.yaml` |
 | `ECS_VCPUS`, `DESIRED/MIN/MAX_CAPACITY` | 2 / 2 / 2 / 4 | Task size and autoscaling range |
+| `ECS_CPU_TARGET_UTILIZATION_PERCENTAGE` | `50` | Autoscaling target on average CPU |
+| `ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE` | `0` (off) | Optional second target on memory. LiteLLM idles at about 45% of a 2 GB task and its memory doesn't follow load, while target tracking assumes it does, so any memory target keeps an extra task running. Leave it off unless memory pressure is the real limit |
 | `STACK_ENV` | empty | State key prefix; empty keeps the upstream state keys |
 | `AUTO_APPROVE` | `false` | Apply plans without the prompt |
 

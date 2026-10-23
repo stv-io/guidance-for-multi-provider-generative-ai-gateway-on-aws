@@ -1,15 +1,15 @@
 # Architecture diagrams
 
 Diagrams of the ECS deployment of `litellm-terraform-stack` as configured on the
-`sandbox-deploy` branch (eu-west-1, CloudFront VPC origin to an internal ALB, Route 53 off in the sandbox). They are drawn from
-the Terraform and middleware code, not from a live account. Drawn 2026-10-22.
+`sandbox-deploy` branch (eu-west-1, own domain `llm.sandbox.myops-lab.cloud`, edge WAF on CloudFront, CloudFront VPC origin to an internal ALB over HTTPS). They are drawn from
+the Terraform and middleware code, not from a live account. Drawn 2026-10-22; updated the same day for the HTTPS origin, edge WAF, own domain, per-AZ NAT and CPU-only scaling.
 
 | Diagram | What it shows |
 |---|---|
-| [`01-overview`](01-overview.png) | End-to-end request flow: clients → CloudFront → VPC origin → internal ALB with WAF → the Fargate task (middleware + LiteLLM) → Bedrock or external providers, plus RDS, Valkey and the regional services. |
-| [`02-network`](02-network.png) | The VPC: two AZs, public and private /19 subnets, the internal ALB and CloudFront VPC-origin ENIs in the private subnets, single NAT, S3 gateway endpoint, conditional interface endpoints, route tables and the security-group chain. |
-| [`03-request-routing`](03-request-routing.png) | ALB listener rules in priority order (middleware paths → :3000, everything else → :4000), the CloudFront secret header, the :443 listener, the admin-only `/key/generate` gate, and how master keys, virtual keys and Okta JWTs are handled. |
-| [`04-sandbox-vs-production`](04-sandbox-vs-production.png) | Side by side: `envs/sandbox.env`, the settings `envs/production.env` changes, and production in its own AWS account (own domain with split certificates, SSO, 2–6 tasks, Multi-AZ RDS, 2 Valkey nodes). |
+| [`01-overview`](01-overview.png) | End-to-end request flow: clients → CloudFront with the edge WAF → VPC origin (HTTPS) → internal ALB → the Fargate task (middleware + LiteLLM) → Bedrock or external providers, plus RDS, Valkey and the regional services. |
+| [`02-network`](02-network.png) | The VPC: two AZs, public and private /19 subnets, the internal ALB and CloudFront VPC-origin ENIs in the private subnets, single NAT (one per AZ with `NAT_GATEWAY_PER_AZ`), S3 gateway endpoint, conditional interface endpoints, route tables and the security-group chain. |
+| [`03-request-routing`](03-request-routing.png) | ALB listener rules in priority order (P20–P27 middleware paths → :3000, P90 everything else including the Bedrock pass-through → :4000, default 403), the CloudFront secret header, the other listener modes, the admin-only `/key/generate` gate, and how master keys, virtual keys and Okta JWTs are handled. |
+| [`04-sandbox-vs-production`](04-sandbox-vs-production.png) | Side by side: `envs/sandbox.env`, the settings `envs/production.env` changes, and production in its own AWS account (own domain with stack-issued certificates, SSO, 2–6 tasks, Multi-AZ RDS, 2 Valkey nodes, one NAT per AZ). |
 
 Each diagram is stored three ways:
 
@@ -27,7 +27,11 @@ Each diagram is stored three ways:
    The AWS icons are embedded in the file, so nothing else has to be installed.
 2. Edit, then save the `.excalidraw` file.
 3. Re-export the PNG and SVG with the same names (excalidraw.com: menu → Export image,
-   background on, scale 1×) and commit all three files together.
+   background on, scale 1×) and commit all three files together. The
+   [mcp_excalidraw](https://github.com/yctimlin/mcp_excalidraw) canvas server can do this
+   headlessly: `POST /api/files` with the scene's `files`, `POST /api/elements/sync` with its
+   `elements`, then `POST /api/export/image`. A browser must be connected to the canvas, or
+   the embedded icons are left out.
 
 ## Conventions
 
