@@ -39,6 +39,14 @@ Recorded so they aren't lost. Nothing has been chosen for any of them.
   Test I1.
 - Upstream, the HTTPS listener's catch-all secret-header rule shadowed every middleware path.
 
+## Status
+
+The sandbox deployment (`llm.sandbox.myops-lab.cloud`, eu-west-1) ran from 2026-10-22 to
+2026-10-23. It was torn down on 2026-10-23: both Terraform stacks, the two ECR repositories
+and the RDS log group are gone. The Terraform state bucket and the `sandbox.myops-lab.cloud`
+hosted zone remain. To bring it back, follow [`deployment.md`](deployment.md) → *Deploy the
+sandbox* or *Redeploy in another account or region*.
+
 ## Lessons for the next deployment
 
 - Switching a live stack's CloudFront VPC origin from HTTP to HTTPS needs a `state rm`
