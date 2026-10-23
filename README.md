@@ -5,7 +5,8 @@
 > Bedrock-only defaults, admin-only key creation and an end-to-end validation suite.
 > Start with [docs/deployment.md](docs/deployment.md). Diagrams are in
 > [docs/diagrams/](docs/diagrams/README.md), tests in [validation/](validation/README.md)
-> and PoC criteria in [docs/poc-success-criteria.md](docs/poc-success-criteria.md).
+> PoC criteria in [docs/poc-success-criteria.md](docs/poc-success-criteria.md) and the decisions
+> taken on this fork in [docs/decisions.md](docs/decisions.md).
 
 ## Table of contents
 

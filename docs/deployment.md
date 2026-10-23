@@ -29,6 +29,8 @@ different environment profile. Diagrams are in [`docs/diagrams/`](diagrams/READM
 - Bedrock model access for the models in `config/default-config-<region>.yaml`.
 - Docker with BuildKit, `terraform` ≥ 1.6, `yq` v4, `jq`, AWS CLI v2. The images
   are built for the `CPU_ARCHITECTURE` set in the profile (`arm` = Graviton).
+- `cosign`, so the build verifies the LiteLLM image signature. Without it the check is
+  skipped with a warning. `curl` and `dig` for `validation/smoke.sh`.
 - An optional `uv` for the Python tests and tools (see README → *Python tooling*).
 
 ## Deploy the sandbox
@@ -48,6 +50,50 @@ service URL ends up in `litellm-terraform-stack/resources.txt`.
 The master key is stored in Secrets Manager, in the secret whose name starts with
 `LiteLLMMasterSalt-` (`LITELLM_MASTER_KEY`). Admin UI: `https://<service-url>/ui/`.
 Log in with user `admin` and the master key as the password.
+
+## Redeploy in another account or region
+
+Everything the deployment needs is in this repo except two values in `.env`: the state
+bucket name and the alarm email. Terraform state lives in that bucket in the target account,
+so a new account starts from empty state.
+
+1. **Target account.**
+   - Create an admin CLI profile, with the region set to the stack region. `deploy.sh` takes
+     the region from the profile.
+   - Turn on Bedrock model access for the models in `config/default-config-<region>.yaml`.
+     Anthropic models also need the one-off use-case form.
+   - Request quota increases early.
+2. **Region.** `config/default-config-<region>.yaml` must exist; there are files for 17
+   regions. EU regions use `eu.*` cross-region inference profiles, US regions `us.*`, and so
+   on. Check that the list matches what the account has access to.
+3. **Domain.** Create or delegate a public Route 53 hosted zone in the target account. The
+   stack issues and DNS-validates both certificates in it.
+4. **Profile.** Copy the closest profile, e.g. `cp envs/production.env envs/<name>.env`. Set
+   `STACK_ENV`, `HOSTED_ZONE_NAME`, `RECORD_NAME` and the sizing. Then build `.env`:
+   ```bash
+   cat .env.template envs/<name>.env > .env
+   # add TERRAFORM_S3_BUCKET_NAME (globally unique; created if missing)
+   # add ALARM_EMAIL (kept out of git: this repo is public)
+   rm -f config/config.yaml        # regenerated for the new region
+   ```
+5. **Deploy and test.**
+   ```bash
+   AWS_PROFILE=<profile> ./deploy.sh
+   AWS_PROFILE=<profile> ./validation/smoke.sh
+   ```
+   Click the *AWS Notification – Subscription Confirmation* email, or test X2 fails. On a
+   new account X1 can also fail until Cost Explorer has data (up to 24 h after first use).
+6. **Hand over.**
+   - The service URL is in `litellm-terraform-stack/resources.txt`.
+   - The master key is in the Secrets Manager secret `LiteLLMMasterSalt-*`, field
+     `LITELLM_MASTER_KEY`.
+   - Admin UI: `https://<service-url>/ui/`, user `admin`, the master key as the password.
+     API reference (Swagger): `https://<service-url>/`.
+
+When reusing a checkout, `terraform plan` can fail with *cached package … does not match
+the checksums in the lock file*. Run `terraform init -backend-config=backend.hcl` in both
+stack folders. Delete `backend.hcl` and the stacks' `.terraform/` folders before pointing a
+checkout at another account.
 
 ## Deploy production on your own domain
 
@@ -153,5 +199,6 @@ AWS_PROFILE=sandbox ./undeploy.sh
   lags by hours, and a CloudWatch alarm on Bedrock tokens per hour, sent by email through SNS.
   Both count all Bedrock use in the account and region, not only the gateway's. The SNS
   subscription needs its confirmation email clicked once.
+- Decisions taken on this fork and why: [`decisions.md`](decisions.md).
 - See [`poc-success-criteria.md`](poc-success-criteria.md) for the PoC exit
   criteria and the items that block a customer pilot.
