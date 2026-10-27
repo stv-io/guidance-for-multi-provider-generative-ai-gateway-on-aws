@@ -5,8 +5,8 @@ variable "name" {
 }
 
 variable "vpc_id" {
-  type        = string
-  default     = ""
+  type      = string
+  default   = ""
   description = "If set, use this VPC instead of creating a new one. Leave empty to create a new VPC."
 }
 
@@ -222,48 +222,48 @@ variable "architecture" {
 }
 
 variable "disable_outbound_network_access" {
-  description = "Whether to disable outbound network access from the VPC"
-  type        = bool
+    description = "Whether to disable outbound network access from the VPC"
+    type = bool
 }
 
 variable "desired_capacity" {
   description = "Desired number of ECS tasks"
-  type        = number
+  type = number
 }
 
 variable "min_capacity" {
   description = "Minimum number of ECS tasks (autoscaling)"
-  type        = number
+  type = number
 }
 
 variable "max_capacity" {
   description = "Maximum number of ECS tasks (autoscaling)"
-  type        = number
+  type = number
 }
 
 variable "public_load_balancer" {
   description = "whether the load balancer is public"
-  type        = bool
+  type = bool
 }
 
 variable "cpu_target_utilization_percent" {
   description = "CPU target utilization percent for autoscale"
-  type        = number
+  type = number
 }
 
 variable "memory_target_utilization_percent" {
   description = "Memory target utilization percent for autoscale; 0 disables memory-based scaling"
-  type        = number
-  default     = 0
+  type = number
+  default = 0
 }
 
 variable "vcpus" {
   description = "Number of ECS vcpus"
-  type        = number
+  type = number
 }
 
 variable "create_vpc_endpoints_in_existing_vpc" {
-  type        = bool
+  type    = bool
   description = "If using an existing VPC, set this to true to also create interface/gateway endpoints within it."
 }
 
@@ -304,29 +304,29 @@ variable "redis_num_cache_clusters" {
 }
 
 variable "disable_swagger_page" {
-  type        = bool
+  type    = bool
   description = "Hide the unauthenticated API docs: Swagger UI (/), ReDoc (/redoc) and the OpenAPI schema (/openapi.json)"
 }
 
 variable "disable_admin_ui" {
-  type        = bool
+  type    = bool
   description = "Whether to disable the admin UI or not"
 }
 
 variable "langfuse_public_key" {
-  type        = string
+  type    = string
   description = "the public key of your langfuse deployment"
 }
 
 variable "langfuse_secret_key" {
-  type        = string
+  type    = string
   description = "the secret key of your langfuse deployment"
 }
 
 variable "langfuse_host" {
-  type        = string
+  type    = string
   description = "the hostname of your langfuse deployment. Optional, defaults to https://cloud.langfuse.com"
-  default     = "https://cloud.langfuse.com"
+  default = "https://cloud.langfuse.com"
 }
 
 variable "cloudfront_vpc_origin" {
