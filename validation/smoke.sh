@@ -206,13 +206,15 @@ if [ -n "$CF_ID" ]; then
 else skip "CloudFront not in use"; fi
 
 CURRENT=E9
-docs=""; for p in / /redoc /openapi.json; do
+docs=""; for p in /redoc /openapi.json; do
   docs+="$p=$(curl -s -o /dev/null -w '%{http_code}' "$BASE$p" --max-time 20) "
 done
-if [ "${DISABLE_SWAGGER_PAGE:-false}" != true ]; then skip "DISABLE_SWAGGER_PAGE=false: ${docs% }"
-# With the docs off, / falls through to LiteLLM's authenticated home route (401)
-elif [[ "$docs" =~ ^/=(401|404)\ /redoc=404\ /openapi.json=404\ $ ]]; then pass "API docs hidden: ${docs% }"
-else fail "API docs still served: ${docs% }"; fi
+# With the docs off, / falls through to LiteLLM's public home route ("LiteLLM: RUNNING")
+curl -s -o "$TMP/body" "$BASE/" --max-time 20 || true
+grep -qi swagger "$TMP/body" && root=swagger || root=no-swagger
+if [ "${DISABLE_SWAGGER_PAGE:-false}" != true ]; then skip "DISABLE_SWAGGER_PAGE=false: /=$root ${docs% }"
+elif [ "$root $docs" = "no-swagger /redoc=404 /openapi.json=404 " ]; then pass "API docs hidden: /=$root ${docs% }"
+else fail "API docs still served: /=$root ${docs% }"; fi
 
 # ---------------------------------------------------------------- Auth
 echo "== Auth"

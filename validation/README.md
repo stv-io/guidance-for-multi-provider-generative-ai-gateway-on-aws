@@ -40,7 +40,7 @@ of a cent; `ALL_MODELS=1` costs a few cents.
 | **E6** | Edge | CloudFront → ALB is encrypted | With a custom domain and a VPC origin: the VPC origin's protocol policy is `https-only` |
 | **E7** | Edge | Custom domain works | The service URL is `https://RECORD_NAME.HOSTED_ZONE_NAME`, it has A and AAAA records, and `/health/liveliness` returns 200 with certificate verification on |
 | **E8** | Edge | Edge WAF is active | The distribution has a CLOUDFRONT-scope web ACL, and a request with a Log4Shell-style header (`${jndi:…}`) gets 403 |
-| **E9** | Edge | Unauthenticated API docs are hidden | With `DISABLE_SWAGGER_PAGE=true`: `/redoc` and `/openapi.json` return 404, and `/` no longer serves Swagger UI (401: LiteLLM's authenticated home route) |
+| **E9** | Edge | Unauthenticated API docs are hidden | With `DISABLE_SWAGGER_PAGE=true`: `/redoc` and `/openapi.json` return 404, and `/` no longer serves Swagger UI (it returns LiteLLM's `"LiteLLM: RUNNING"`) |
 | **A1** | Auth | Unauthenticated calls are refused | `GET /v1/models` without a key returns 401 |
 | **A2** | Auth | Bogus keys are refused | `GET /v1/models` with `sk-invalid…` returns 401 |
 | **A3** | Auth | Model list is Bedrock-only | `GET /v1/models` with the master key lists exactly the models in `config/config.yaml` |

@@ -43,10 +43,10 @@ Recorded so they aren't lost. Nothing has been chosen for any of them.
 ## Status
 
 The sandbox deployment (`llm.sandbox.myops-lab.cloud`, eu-west-1) ran from 2026-10-22 to
-2026-10-23. It was torn down on 2026-10-23: both Terraform stacks, the two ECR repositories
-and the RDS log group are gone. The Terraform state bucket and the `sandbox.myops-lab.cloud`
-hosted zone remain. To bring it back, follow [`deployment.md`](deployment.md) → *Deploy the
-sandbox* or *Redeploy in another account or region*.
+2026-10-23, and again on 2026-10-27 to test phase 2 (43 of 44 smoke checks passed). It was torn
+down after each run: both Terraform stacks, the two ECR repositories and the RDS log group are
+gone. The Terraform state bucket and the `sandbox.myops-lab.cloud` hosted zone remain. To pick
+the work up again, start with [`next-steps.md`](next-steps.md).
 
 ## Lessons for the next deployment
 
