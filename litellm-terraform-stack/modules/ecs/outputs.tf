@@ -43,3 +43,16 @@ output "cloudfront_auth_secret" {
   value       = var.use_cloudfront ? random_password.cloudfront_secret[0].result : null
   sensitive   = true
 }
+
+output "alb_arn_suffix" {
+  value       = aws_lb.this.arn_suffix
+  description = "ALB ARN suffix (the LoadBalancer dimension of AWS/ApplicationELB metrics)"
+}
+
+output "target_group_arn_suffixes" {
+  value = {
+    litellm    = aws_lb_target_group.tg_4000.arn_suffix
+    middleware = aws_lb_target_group.tg_3000.arn_suffix
+  }
+  description = "Target group ARN suffixes (the TargetGroup dimension of AWS/ApplicationELB metrics)"
+}

@@ -80,9 +80,21 @@ source .env
 STACK_ENV=${STACK_ENV:-}
 AUTO_APPROVE=${AUTO_APPROVE:-false}
 
-# Plan, show it, and apply only that plan: on AUTO_APPROVE=true, or after confirmation on a terminal
+# Plan, show it, and apply only that plan: on AUTO_APPROVE=true, or after confirmation on a terminal.
+# A plan without changes is not applied. Off a terminal, a plan with changes is kept as tfplan for
+# review (terraform show tfplan; terraform apply tfplan) and deploy.sh stops; rerun it afterwards.
 tf_plan_apply() {
-    terraform plan -input=false -out=tfplan "$@"
+    local rc=0
+    terraform plan -input=false -detailed-exitcode -out=tfplan "$@" || rc=$?
+    if [ "$rc" -eq 0 ]; then
+        echo "No changes in $(basename "$(pwd)")."
+        rm -f tfplan
+        return 0
+    elif [ "$rc" -ne 2 ]; then
+        echo "terraform plan failed in $(basename "$(pwd)")"
+        rm -f tfplan
+        exit 1
+    fi
     if [ "$AUTO_APPROVE" = "true" ]; then
         :
     elif [ -t 0 ]; then
@@ -90,7 +102,8 @@ tf_plan_apply() {
         [ "$answer" = "y" ] || { echo "Aborted; nothing applied."; rm -f tfplan; exit 1; }
     else
         echo "Not running on a terminal and AUTO_APPROVE is not true: stopping after plan."
-        rm -f tfplan
+        echo "Saved plan: $(pwd)/tfplan. Review it with 'terraform show tfplan', apply it with"
+        echo "'terraform apply tfplan', then rerun deploy.sh."
         exit 1
     fi
     terraform apply -input=false tfplan
@@ -403,6 +416,10 @@ export TF_VAR_nat_gateway_per_az=${NAT_GATEWAY_PER_AZ:-false}
 export TF_VAR_alarm_email=${ALARM_EMAIL:-}
 export TF_VAR_bedrock_monthly_budget_usd=${BEDROCK_MONTHLY_BUDGET_USD:-100}
 export TF_VAR_bedrock_tokens_per_hour_alarm=${BEDROCK_TOKENS_PER_HOUR_ALARM:-2000000}
+export TF_VAR_health_alarms=${HEALTH_ALARMS:-true}
+export TF_VAR_health_alarm_notifications=${HEALTH_ALARM_NOTIFICATIONS:-false}
+export TF_VAR_alb_5xx_alarm_count=${ALB_5XX_ALARM_COUNT:-10}
+export TF_VAR_rds_connections_alarm=${RDS_CONNECTIONS_ALARM:-60}
 
 # Display CloudFront and Route53 configuration
 echo "USE_ROUTE53: $USE_ROUTE53"

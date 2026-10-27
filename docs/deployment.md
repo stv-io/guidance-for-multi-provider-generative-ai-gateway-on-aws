@@ -14,7 +14,7 @@ different environment profile. Diagrams are in [`docs/diagrams/`](diagrams/READM
 | ALB | private subnets, SG admits only the CloudFront origin-facing prefix list, TLS 1.3 policy, forwards only requests with the CloudFront secret header | same |
 | WAF | CLOUDFRONT-scope web ACL: AWS common rules, known bad inputs, IP reputation, 2,000 requests / 5 min per IP | same |
 | Compute | ECS Fargate ARM64, 1 task × 1 vCPU / 2 GB (autoscale 1–2) | 2–6 tasks × 2 vCPU / 4 GB |
-| App | LiteLLM v1.106.2 pinned by digest and cosign-verified (:4000), middleware (:3000), both in one task | same |
+| App | LiteLLM v1.106.4 pinned by digest, cosign- and provenance-verified (:4000), middleware (:3000), both in one task | same |
 | Database | RDS PostgreSQL 18, `db.t4g.micro`, single-AZ | `db.t4g.medium`, Multi-AZ, 50 GB |
 | Cache | ElastiCache Valkey 9.1, 1 × `cache.t4g.micro` | 2 × `cache.t4g.small`, Multi-AZ with automatic failover |
 | Network | new VPC, 2 public + 2 private subnets, 1 NAT gateway, S3 gateway endpoint | same, with one NAT gateway per AZ (`NAT_GATEWAY_PER_AZ=true`) |
@@ -40,11 +40,14 @@ cat .env.template envs/sandbox.env > .env     # later lines win
 # set TERRAFORM_S3_BUCKET_NAME in .env (globally unique; created if missing)
 rm -f config/config.yaml                      # regenerate from the model lists
 AWS_PROFILE=sandbox ./deploy.sh               # plans each stack, asks before applying
-AWS_PROFILE=sandbox ./validation/smoke.sh     # 38 end-to-end checks
+AWS_PROFILE=sandbox ./validation/smoke.sh     # 44 end-to-end checks
 ```
 
 `deploy.sh` writes each Terraform plan to a file, shows it, and applies that
-exact plan only after you type `y`, or when `AUTO_APPROVE=true` is set (for CI). The
+exact plan only after you type `y`, or when `AUTO_APPROVE=true` is set (for CI). A plan
+with no changes is skipped. Run without a terminal, it stops at the first plan with changes
+and keeps it as `tfplan` in that stack's folder: review it with `terraform show tfplan`,
+apply it with `terraform apply tfplan`, and rerun `deploy.sh` to continue. The
 service URL ends up in `litellm-terraform-stack/resources.txt`.
 
 The master key is stored in Secrets Manager, in the secret whose name starts with
@@ -88,7 +91,7 @@ so a new account starts from empty state.
    - The master key is in the Secrets Manager secret `LiteLLMMasterSalt-*`, field
      `LITELLM_MASTER_KEY`.
    - Admin UI: `https://<service-url>/ui/`, user `admin`, the master key as the password.
-     API reference (Swagger): `https://<service-url>/`.
+     API reference: hidden by default (`DISABLE_SWAGGER_PAGE`); see LiteLLM's hosted docs.
 
 When reusing a checkout, `terraform plan` can fail with *cached package … does not match
 the checksums in the lock file*. Run `terraform init -backend-config=backend.hcl` in both
@@ -128,13 +131,15 @@ so the environments never share state even if they share a bucket.
 | `USE_ROUTE53`, `HOSTED_ZONE_NAME`, `RECORD_NAME` | sandbox: `llm` in `sandbox.myops-lab.cloud` | Custom domain; also switches the CloudFront → ALB hop to HTTPS |
 | `CLOUDFRONT_WAF`, `CLOUDFRONT_WAF_RATE_LIMIT` | `true`, `2000` | Edge web ACL and its per-IP limit (requests per 5 minutes). Behind a VPC origin it replaces the regional ACL on the ALB |
 | `NAT_GATEWAY_PER_AZ` | `false` (production `true`) | One NAT gateway per AZ, about $35/month more per extra NAT plus data |
-| `LITELLM_VERSION`, `LITELLM_IMAGE_DIGEST` | `v1.106.2`, its index digest | The build refuses an image whose tag has moved or whose cosign signature fails against `config/litellm-cosign.pub`. Update both together |
+| `LITELLM_VERSION`, `LITELLM_IMAGE_DIGEST` | `v1.106.4`, its index digest | The build refuses an image whose tag has moved, whose cosign signature fails against `config/litellm-cosign.pub`, or whose provenance isn't `BerriAI/litellm` at the tag's commit. Change them with `scripts/litellm-bump.sh` (see *Upgrading LiteLLM*) |
 | `RDS_MULTI_AZ` | `true` (sandbox `false`) | RDS standby in a second AZ |
 | `REDIS_NUM_CACHE_CLUSTERS` | `2` (sandbox `1`) | >1 turns on Multi-AZ and automatic failover |
 | `INCLUDE_BASE_MODELS` | `true` (profiles `false`) | `false` loads only the region's Bedrock models, not the ~90 third-party entries in `default-config-base.yaml` |
 | `ECS_VCPUS`, `DESIRED/MIN/MAX_CAPACITY` | 2 / 2 / 2 / 4 | Task size and autoscaling range |
 | `ECS_CPU_TARGET_UTILIZATION_PERCENTAGE` | `50` | Autoscaling target on average CPU |
+| `HEALTH_ALARMS`, `HEALTH_ALARM_NOTIFICATIONS`, `ALB_5XX_ALARM_COUNT`, `RDS_CONNECTIONS_ALARM` | `true`, `false`, `10`, `60` (production `300`) | Health alarms: ALB 5xx, no healthy or some unhealthy targets, RDS CPU, free storage and connections, Valkey memory. They only change state in CloudWatch unless `HEALTH_ALARM_NOTIFICATIONS=true`, which emails them (and their return to OK) to `ALARM_EMAIL` |
 | `ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE` | `0` (off) | Optional second target on memory. LiteLLM idles at about 45% of a 2 GB task and its memory doesn't follow load, while target tracking assumes it does, so any memory target keeps an extra task running. Leave it off unless memory pressure is the real limit |
+| `DISABLE_SWAGGER_PAGE` | `true` | Hides the unauthenticated API docs: Swagger UI at `/`, `/redoc` and `/openapi.json`. The Admin UI's API reference view needs `/openapi.json` and stops working; the rest of the UI doesn't use it |
 | `STACK_ENV` | empty | State key prefix; empty keeps the upstream state keys |
 | `AUTO_APPROVE` | `false` | Apply plans without the prompt |
 
@@ -166,6 +171,40 @@ server-side chat history and do not accept prompt ARNs. The OpenAI path still ha
 - The middleware's `/user/new` self-service path verifies **Okta** JWTs only. To use
   Google or another IdP for it, the verification needs replacing with a generic
   OIDC/JWKS check. That isn't done yet.
+
+## Upgrading LiteLLM
+
+LiteLLM ships patch releases on several minor lines at once (for example 1.103.x to 1.106.x) and
+backports fixes to each. The image is pinned by version and digest, so nothing changes until you
+move the pin:
+
+```bash
+scripts/litellm-bump.sh             # newest patch on the current line, e.g. v1.106.2 -> v1.106.4
+scripts/litellm-bump.sh --latest    # newest stable release on any line
+scripts/litellm-bump.sh v1.105.5    # a specific release
+```
+
+It lists the release notes to read, then runs `scripts/litellm-verify-image.sh`, which checks
+three things:
+- The tag resolves to the digest.
+- The image is signed with `config/litellm-cosign.pub`.
+- Every platform's build provenance names `https://github.com/BerriAI/litellm` at the commit the
+  release tag points to.
+
+Only when all three pass does it write the new `LITELLM_VERSION` and `LITELLM_IMAGE_DIGEST` into
+`.env.template` and `.env`. Then deploy, run `validation/smoke.sh` (I7 checks the running version)
+and open a PR.
+
+The signature alone isn't enough. On 2026-10-21 a malicious v1.107.0 was published through
+LiteLLM's own release workflow with stolen maintainer tokens
+([BerriAI/litellm#47826](https://github.com/BerriAI/litellm/issues/47826)). It carried a valid
+signature but was built from the lookalike repo `Berri-AI/litellm`, which the provenance check
+rejects. The digest pin kept this deployment on v1.106.2 throughout.
+
+LiteLLM rotated its signing key on 2026-10-23 (commit `e82a3c6`, PR #48103). `config/litellm-cosign.pub`
+holds the new key, fetched from that commit and checked against the SHA-256 in the v1.106.3 release
+notes (`e3fe3e08c44b16407fe0b37c43b4f8b603b3a0f4ee74c29e647bc022d762c2c0`). Releases before v1.103.8,
+v1.104.6, v1.105.4 and v1.106.3 were signed with the old key and no longer verify.
 
 ## Tear down
 

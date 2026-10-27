@@ -731,7 +731,8 @@ async def forward_user_new(request: Request):
             await access_token_verifier.verify(token)
             print("token is verified.")
         except Exception as e:
-            print(f"exception: {e}")
+            # The exception text can quote the token's claims; log only its type
+            print(f"JWT verification failed: {type(e).__name__}")
             # If the JWT verification fails, user is not authorized.
             raise HTTPException(
                 status_code=401, detail={"error": "Invalid or expired token"}
@@ -740,7 +741,6 @@ async def forward_user_new(request: Request):
         headers, claims, signing_input, signature = JWTUtils.parse_token(token)
 
         sub = claims.get("sub")
-        print(f"sub: {sub}")
         if not sub:
             raise HTTPException(
                 status_code=403, detail={"error": "No sub claim found in the token"}
@@ -754,7 +754,6 @@ async def forward_user_new(request: Request):
         body_json["user_email"] = sub
         body_json["user_id"] = sub
         body_json["user_role"] = "internal_user"
-        print(f"body_json: {body_json}")
         request_body = json.dumps(body_json).encode()
         final_headers["content-length"] = str(len(request_body))
         final_headers["authorization"] = f"Bearer {MASTER_KEY}"

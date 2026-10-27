@@ -31,14 +31,6 @@ model_list:
     litellm_params:
       model: bedrock/mistral.mistral-large-2402-v1:0
 
-  - model_name: eu.meta.llama3-2-3b-instruct-v1:0
-    litellm_params:
-      model: bedrock/eu.meta.llama3-2-3b-instruct-v1:0
-
-  - model_name: eu.meta.llama3-2-1b-instruct-v1:0
-    litellm_params:
-      model: bedrock/eu.meta.llama3-2-1b-instruct-v1:0
-
 
 #Current-generation models via EU cross-region inference profiles
   - model_name: eu.anthropic.claude-haiku-4-5-20251001-v1:0

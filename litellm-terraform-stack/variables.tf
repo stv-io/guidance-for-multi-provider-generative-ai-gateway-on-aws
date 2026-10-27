@@ -305,7 +305,7 @@ variable "redis_num_cache_clusters" {
 
 variable "disable_swagger_page" {
   type    = bool
-  description = "Whether to disable the swagger page or not"
+  description = "Hide the unauthenticated API docs: Swagger UI (/), ReDoc (/redoc) and the OpenAPI schema (/openapi.json)"
 }
 
 variable "disable_admin_ui" {
@@ -354,9 +354,33 @@ variable "cloudfront_waf_rate_limit" {
 }
 
 variable "alarm_email" {
-  description = "Recipient of the Bedrock budget and token alarms. Empty = no alarms"
+  description = "Recipient of the Bedrock budget and token alarms, and of the health alarms when health_alarm_notifications is true. Empty = no email alarms"
   type        = string
   default     = ""
+}
+
+variable "health_alarms" {
+  description = "Create the health alarms (ALB 5xx and targets, RDS, Valkey)"
+  type        = bool
+  default     = true
+}
+
+variable "health_alarm_notifications" {
+  description = "Email the health alarms (and their return to OK) to alarm_email through the SNS topic. false = alarms only change state in CloudWatch"
+  type        = bool
+  default     = false
+}
+
+variable "alb_5xx_alarm_count" {
+  description = "5xx responses in 5 minutes (ALB-generated and task-generated, alarmed separately) that raise an alarm"
+  type        = number
+  default     = 10
+}
+
+variable "rds_connections_alarm" {
+  description = "Database connections that raise an alarm. Postgres max_connections is LEAST(DBInstanceClassMemory/9531392, 5000): roughly 80-100 on db.t4g.micro, ~400 on db.t4g.medium"
+  type        = number
+  default     = 60
 }
 
 variable "bedrock_monthly_budget_usd" {

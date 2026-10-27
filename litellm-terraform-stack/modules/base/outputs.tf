@@ -78,9 +78,12 @@ output "MiddlewareRepositoryUrl" {
   value       = data.aws_ecr_repository.middleware.repository_url
 }
 
+# Both ARNs come from the secret version, not the secret: the value is the same, but anything that
+# reads them (the ECS task definition) then waits until the secret has a value. Otherwise the first
+# task of a fresh deploy can start before it and fail with "can't find ... staging label: AWSCURRENT".
 output "DatabaseUrlSecretArn" {
-  description = "The endpoint of the main database"
-  value       = aws_secretsmanager_secret.db_url_secret.arn
+  description = "ARN of the secret holding the database URL"
+  value       = aws_secretsmanager_secret_version.db_url_secret_ver.secret_arn
 }
 
 output "RedisUrl" {
@@ -105,7 +108,7 @@ output "RedisPassword" {
 
 output "LitellmMasterAndSaltKeySecretArn" {
   description = "LiteLLM Master & Salt Key Secret ARN"
-  value       = aws_secretsmanager_secret.litellm_master_salt.arn
+  value       = aws_secretsmanager_secret_version.litellm_master_salt_ver.secret_arn
 }
 
 output "DbSecurityGroupId" {
@@ -123,4 +126,14 @@ output "litellm_master_key" {
 
 output "litellm_salt_key" {
   value = local.litellm_salt_key
+}
+
+output "rds_identifier" {
+  description = "RDS instance identifier (the DBInstanceIdentifier dimension of AWS/RDS metrics)"
+  value       = aws_db_instance.database.identifier
+}
+
+output "redis_replication_group_id" {
+  description = "ElastiCache replication group ID; its nodes are <id>-001, <id>-002, ... (the CacheClusterId dimension)"
+  value       = aws_elasticache_replication_group.redis.replication_group_id
 }
