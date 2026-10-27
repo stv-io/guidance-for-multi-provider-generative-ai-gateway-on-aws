@@ -448,15 +448,20 @@ if [ -z "${ALARM_EMAIL:-}" ]; then skip "ALARM_EMAIL not set"; else
 fi
 
 CURRENT=X3
-if [ -z "${ALARM_EMAIL:-}" ] || [ "${HEALTH_ALARMS:-true}" != true ]; then skip "ALARM_EMAIL not set or HEALTH_ALARMS off"; else
+if [ "${HEALTH_ALARMS:-true}" != true ]; then skip "HEALTH_ALARMS off"; else
   # 2 ALB 5xx + 2 per target group (litellm, middleware) + 3 RDS + 1 per Valkey node
   want=$((2 + 4 + 3 + ${REDIS_NUM_CACHE_CLUSTERS:-1}))
+  notify=$([ "${HEALTH_ALARM_NOTIFICATIONS:-false}" = true ] && [ -n "${ALARM_EMAIL:-}" ] && echo true || echo false)
   alarms=$(aws cloudwatch describe-alarms --alarm-name-prefix "${MAIN_STACK_NAME}-" --output json 2>/dev/null |
-    jq -c '[.MetricAlarms[] | select(.Namespace != null and .Namespace != "AWS/Bedrock" and (.AlarmActions | length) > 0)]')
-  n=$(jq length <<<"$alarms"); bad=$(jq -r '[.[] | select(.StateValue == "ALARM") | .AlarmName] | join(", ")' <<<"$alarms")
-  if [ "$n" -ne "$want" ]; then fail "$n health alarms with an SNS action, expected $want"
+    jq -c '[.MetricAlarms[] | select(.Namespace != null and .Namespace != "AWS/Bedrock")]')
+  n=$(jq length <<<"$alarms")
+  wired=$(jq '[.[] | select((.AlarmActions | length) > 0)] | length' <<<"$alarms")
+  bad=$(jq -r '[.[] | select(.StateValue == "ALARM") | .AlarmName] | join(", ")' <<<"$alarms")
+  if [ "$n" -ne "$want" ]; then fail "$n health alarms, expected $want"
+  elif [ "$notify" = true ] && [ "$wired" -ne "$n" ]; then fail "only $wired of $n health alarms notify SNS"
+  elif [ "$notify" = false ] && [ "$wired" -ne 0 ]; then fail "$wired health alarms notify SNS although HEALTH_ALARM_NOTIFICATIONS is off"
   elif [ -n "$bad" ]; then fail "in ALARM: $bad"
-  else pass "$n health alarms wired to SNS, none in ALARM"; fi
+  else pass "$n health alarms, none in ALARM, email $([ "$notify" = true ] && echo on || echo off)"; fi
 fi
 
 echo

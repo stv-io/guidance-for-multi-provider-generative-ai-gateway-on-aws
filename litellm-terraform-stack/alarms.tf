@@ -106,13 +106,16 @@ resource "aws_cloudwatch_metric_alarm" "bedrock_tokens" {
 }
 
 ###############################################################################
-# Health alarms (created when alarm_email is set and health_alarms is true)
+# Health alarms (created when health_alarms is true)
 ###############################################################################
-# Same SNS topic as the token alarm. Each alarm also notifies when it returns to OK.
+# They notify only when health_alarm_notifications is true and alarm_email is set (same SNS topic
+# as the token alarm, also on return to OK). Otherwise they only change state in the CloudWatch
+# console, and test X3 checks them there.
 # Container Insights is off (cost), so "no task serving" is detected at the ALB: a target group
 # with no healthy target means every task is down or failing its health check.
 locals {
-  health_alarms = local.spend_alarms && var.health_alarms
+  health_alarms = var.health_alarms
+  health_actions = local.spend_alarms && var.health_alarm_notifications ? [aws_sns_topic.alarms[0].arn] : []
 
   target_groups = module.ecs_cluster.target_group_arn_suffixes
 
@@ -137,8 +140,8 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
   threshold           = var.alb_5xx_alarm_count
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alarms[0].arn]
-  ok_actions          = [aws_sns_topic.alarms[0].arn]
+  alarm_actions       = local.health_actions
+  ok_actions          = local.health_actions
 }
 
 resource "aws_cloudwatch_metric_alarm" "no_healthy_targets" {
@@ -155,8 +158,8 @@ resource "aws_cloudwatch_metric_alarm" "no_healthy_targets" {
   comparison_operator = "LessThanThreshold"
   # No data points means no target reported at all
   treat_missing_data = "breaching"
-  alarm_actions      = [aws_sns_topic.alarms[0].arn]
-  ok_actions         = [aws_sns_topic.alarms[0].arn]
+  alarm_actions      = local.health_actions
+  ok_actions         = local.health_actions
 }
 
 # A task that keeps failing its health check while another one still serves
@@ -173,8 +176,8 @@ resource "aws_cloudwatch_metric_alarm" "unhealthy_targets" {
   threshold           = 0
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alarms[0].arn]
-  ok_actions          = [aws_sns_topic.alarms[0].arn]
+  alarm_actions       = local.health_actions
+  ok_actions          = local.health_actions
 }
 
 resource "aws_cloudwatch_metric_alarm" "rds_cpu" {
@@ -190,8 +193,8 @@ resource "aws_cloudwatch_metric_alarm" "rds_cpu" {
   threshold           = 80
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alarms[0].arn]
-  ok_actions          = [aws_sns_topic.alarms[0].arn]
+  alarm_actions       = local.health_actions
+  ok_actions          = local.health_actions
 }
 
 # LiteLLM writes a spend log row per request, so storage only grows
@@ -208,8 +211,8 @@ resource "aws_cloudwatch_metric_alarm" "rds_free_storage" {
   threshold           = var.rds_allocated_storage * 1073741824 * 0.1
   comparison_operator = "LessThanThreshold"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alarms[0].arn]
-  ok_actions          = [aws_sns_topic.alarms[0].arn]
+  alarm_actions       = local.health_actions
+  ok_actions          = local.health_actions
 }
 
 resource "aws_cloudwatch_metric_alarm" "rds_connections" {
@@ -225,8 +228,8 @@ resource "aws_cloudwatch_metric_alarm" "rds_connections" {
   threshold           = var.rds_connections_alarm
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alarms[0].arn]
-  ok_actions          = [aws_sns_topic.alarms[0].arn]
+  alarm_actions       = local.health_actions
+  ok_actions          = local.health_actions
 }
 
 # Valkey holds the rate-limit counters and the response cache; when it is full, volatile-lru
@@ -244,6 +247,6 @@ resource "aws_cloudwatch_metric_alarm" "valkey_memory" {
   threshold           = 80
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alarms[0].arn]
-  ok_actions          = [aws_sns_topic.alarms[0].arn]
+  alarm_actions       = local.health_actions
+  ok_actions          = local.health_actions
 }

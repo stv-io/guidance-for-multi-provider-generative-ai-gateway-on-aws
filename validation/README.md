@@ -66,7 +66,7 @@ of a cent; `ALL_MODELS=1` costs a few cents.
 | **K6** | Keys | Revocation works on every task | After `POST /key/delete`, four requests in a row with the K1 key all get 401 within `user_api_key_cache_ttl` + 10 s (other tasks keep a cached copy of the key until that TTL) |
 | **X1** | Spend | The Bedrock budget sees all Bedrock spend | Budget `<stack>-bedrock-monthly` exists, excludes credits, and its service filter contains every service Cost Explorer billed for Bedrock in the last 60 days (Anthropic models bill as `Claude … (Amazon Bedrock Edition)`) |
 | **X2** | Spend | The near-real-time token alarm can reach someone | Alarm `<stack>-bedrock-tokens-per-hour` exists with an SNS action, and the email subscription is confirmed |
-| **X3** | Health | Health alarms exist and are quiet | `2 + 4 + 3 + REDIS_NUM_CACHE_CLUSTERS` CloudWatch alarms named `<stack>-…` with an SNS action, none in `ALARM` (skipped without `ALARM_EMAIL` or with `HEALTH_ALARMS=false`) |
+| **X3** | Health | Health alarms exist and are quiet | `2 + 4 + 3 + REDIS_NUM_CACHE_CLUSTERS` CloudWatch alarms named `<stack>-…`, none in `ALARM`; they have the SNS action only when `HEALTH_ALARM_NOTIFICATIONS=true` and `ALARM_EMAIL` is set (skipped with `HEALTH_ALARMS=false`) |
 | **S1** | Security | Secrets are not logged | The last 30 min of the LiteLLM and middleware CloudWatch log groups contain neither the master key nor the K1 key |
 
 ## Adding tests

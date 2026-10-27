@@ -354,15 +354,21 @@ variable "cloudfront_waf_rate_limit" {
 }
 
 variable "alarm_email" {
-  description = "Recipient of the Bedrock budget, token and health alarms. Empty = no alarms"
+  description = "Recipient of the Bedrock budget and token alarms, and of the health alarms when health_alarm_notifications is true. Empty = no email alarms"
   type        = string
   default     = ""
 }
 
 variable "health_alarms" {
-  description = "Create the health alarms (ALB 5xx and targets, RDS, Valkey) when alarm_email is set"
+  description = "Create the health alarms (ALB 5xx and targets, RDS, Valkey)"
   type        = bool
   default     = true
+}
+
+variable "health_alarm_notifications" {
+  description = "Email the health alarms (and their return to OK) to alarm_email through the SNS topic. false = alarms only change state in CloudWatch"
+  type        = bool
+  default     = false
 }
 
 variable "alb_5xx_alarm_count" {
