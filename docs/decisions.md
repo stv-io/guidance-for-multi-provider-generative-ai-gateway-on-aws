@@ -14,6 +14,8 @@ or tests. Test IDs refer to [`validation/README.md`](../validation/README.md).
 | D5 | Autoscale on CPU only; the memory policy is optional and off | LiteLLM idles at about 45% of a 2 GB task, and target tracking assumes memory falls when a task is removed, so any memory target kept an extra task running | `ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE=0`, `alb.tf` |
 | D6 | Keep the shared response cache, with a 1-hour TTL; LiteLLM debug logging off | Without a TTL, `volatile-lru` can't evict cache entries and they crowd out the rate-limit state. Debug logging can write prompts to the logs. Clients opt out per request with `"cache": {"no-cache": true}` | `config/default-config-base.yaml`, `LITELLM_CACHE_TTL_SECONDS`; test C1 |
 | — | Key cache TTL 10 s (`general_settings.user_api_key_cache_ttl`) | LiteLLM evicts a deleted key only on the task that handled the delete, so other tasks accepted it for up to 60 s | `default-config-base.yaml`; test K6 |
+| D7 | Health alarms on the existing SNS topic: ALB 5xx (ALB- and task-generated), no healthy / some unhealthy targets per target group, RDS CPU, free storage and connections, Valkey memory per node | The only alarms watched spend, so an outage or a full database would have gone unnoticed. Container Insights is off, so "no task serving" is detected at the ALB | `alarms.tf`, `HEALTH_ALARMS`; test X3 |
+| D8 | LiteLLM upgrades through `scripts/litellm-bump.sh`: by default the newest patch on the current minor line; every image must pass digest, cosign and build-provenance checks | LiteLLM backports fixes to several lines at once. The 2026-10-21 v1.107.0 compromise was validly signed, and only its provenance (built from the lookalike `Berri-AI/litellm`) gave it away | `scripts/litellm-bump.sh`, `scripts/litellm-verify-image.sh`, `docker-build-and-deploy.sh`; test I7 |
 
 ## Open items (not decided)
 
@@ -22,8 +24,7 @@ Recorded so they aren't lost. Nothing has been chosen for any of them.
 | ID | Item | Why it matters | Options to weigh |
 |----|------|----------------|------------------|
 | D3 | Google (or any OIDC) sign-in for `/user/new` | The middleware verifies Okta JWTs only, so self-service user creation doesn't work with Google Workspace or Entra ID | A generic OIDC/JWKS check (issuer, audience, JWKS URL as settings); LiteLLM's own SSO for the Admin UI instead; or drop `/user/new` and issue keys centrally |
-| TODO-1 | Health alarms | The only alarms watch spend; an outage or a full database would go unnoticed | ALB 5xx rate and unhealthy targets, ECS running tasks below desired, RDS CPU, free storage and connections, Valkey memory; all to the existing SNS topic |
-| TODO-2 | LiteLLM upgrade routine | LiteLLM releases almost daily, and the build refuses an image unless `LITELLM_VERSION` and `LITELLM_IMAGE_DIGEST` match and the cosign signature verifies | A monthly manual bump (version + digest, deploy, `smoke.sh`); a Renovate or Dependabot PR that updates both; how far behind latest to stay; who reviews the release notes |
+| TODO-2 | Scheduled LiteLLM upgrade check | D8 gives a manual routine; nothing prompts anyone to run it | A monthly reminder; or a scheduled GitHub Action that runs `litellm-bump.sh` and opens a PR (it needs Docker and cosign on the runner, and no AWS access); how far behind the newest line to stay |
 
 ## Bugs fixed (all present upstream)
 
