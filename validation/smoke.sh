@@ -41,10 +41,15 @@ body() { cat "$TMP/body"; }
 chat_json() { jq -nc --arg m "$1" --arg p "${2:-Reply with the single word: pong}" '{model:$m,max_tokens:20,messages:[{role:"user",content:$p}]}'; }
 
 TEMP_KEYS=()
+TEMP_TEAMS=()
 cleanup() {
   for k in "${TEMP_KEYS[@]:-}"; do
     [ -n "$k" ] && curl -sS -o /dev/null -X POST "$BASE/key/delete" -H "Authorization: Bearer $MASTER_KEY" \
       -H 'Content-Type: application/json' --data "$(jq -nc --arg k "$k" '{keys:[$k]}')" --max-time 30 || true
+  done
+  for t in "${TEMP_TEAMS[@]:-}"; do
+    [ -n "$t" ] && curl -sS -o /dev/null -X POST "$BASE/team/delete" -H "Authorization: Bearer $MASTER_KEY" \
+      -H 'Content-Type: application/json' --data "$(jq -nc --arg t "$t" '{team_ids:[$t]}')" --max-time 30 || true
   done
   rm -rf "$TMP"
 }
@@ -55,6 +60,16 @@ gen_key() { # gen_key JSON -> sets GEN_KEY (not via $(...), so TEMP_KEYS survive
   [ -n "$k" ] && TEMP_KEYS+=("$k")
   GEN_KEY=$k
 }
+
+gen_team() { # gen_team JSON -> sets GEN_TEAM (team_id)
+  req POST "$BASE/team/new" "$MASTER_KEY" "$1"
+  local t; t=$(body | jq -r '.team_id // empty' 2>/dev/null)
+  [ -n "$t" ] && TEMP_TEAMS+=("$t")
+  GEN_TEAM=$t
+}
+
+# Unique prompt: the response cache answers repeated prompts for free, which would hide spend
+fresh_prompt() { echo "Reply with one word. Request $(date +%s)-$RANDOM"; }
 
 echo "== Discovering deployment"
 tfout() { terraform -chdir="$MAIN_TF" output -raw "$1" 2>/dev/null; }
@@ -217,6 +232,21 @@ curl -sS -N -o "$TMP/stream" -X POST "$BASE/v1/chat/completions" -H "Authorizati
 chunks=$(grep -c '^data: {' "$TMP/stream" || true)
 [ "$chunks" -ge 2 ] && grep -q '^data: \[DONE\]' "$TMP/stream" && pass "$chunks chunks + [DONE]" || fail "chunks=$chunks $(head -c 300 "$TMP/stream")"
 
+# Claude Code and the Anthropic SDKs: ANTHROPIC_BASE_URL=<service url>, the key sent as x-api-key
+CURRENT=M7
+CODE=$(curl -sS -o "$TMP/body" -w '%{http_code}' -X POST "$BASE/v1/messages" -H "x-api-key: $MASTER_KEY" \
+  -H 'anthropic-version: 2023-06-01' -H 'Content-Type: application/json' --max-time 90 \
+  --data "$(jq -nc --arg m "$DEFAULT_MODEL" '{model:$m,max_tokens:20,messages:[{role:"user",content:"Reply with the single word: pong"}]}')") || CODE=000
+text=$(body | jq -r 'select(.type == "message") | .content[0].text // empty' 2>/dev/null)
+[ "$CODE" = 200 ] && [ -n "$text" ] && pass "Anthropic Messages API: \"$text\"" || fail "/v1/messages -> $CODE $(body | head -c 200)"
+
+CURRENT=M7b
+curl -sS -N -o "$TMP/stream" -X POST "$BASE/v1/messages" -H "x-api-key: $MASTER_KEY" \
+  -H 'anthropic-version: 2023-06-01' -H 'Content-Type: application/json' --max-time 90 \
+  --data "$(jq -nc --arg m "$DEFAULT_MODEL" '{model:$m,max_tokens:40,stream:true,messages:[{role:"user",content:"Count from 1 to 5."}]}')"
+deltas=$(grep -c '^event: content_block_delta' "$TMP/stream" || true)
+[ "$deltas" -ge 1 ] && grep -q '^event: message_stop' "$TMP/stream" && pass "$deltas content_block_delta events + message_stop" || fail "deltas=$deltas $(head -c 300 "$TMP/stream")"
+
 CURRENT=M3; req POST "$BASE/v1/embeddings" "$MASTER_KEY" "$(jq -nc --arg m "$EMBED_MODEL" '{model:$m,input:"hello gateway"}')"
 dim=$(body | jq '.data[0].embedding | length' 2>/dev/null)
 [ "$CODE" = 200 ] && [ "$dim" = 1024 ] && pass "$EMBED_MODEL dim=$dim" || fail "$CODE dim=$dim $(body | head -c 200)"
@@ -316,6 +346,37 @@ if [ -n "$KEY" ]; then
   awk "BEGIN{exit !($spend > 0)}" && pass "spend recorded: \$$spend" || fail "spend still $spend after 90s"
 else skip "no K1 key"; fi
 
+CURRENT=T1
+# LiteLLM rejects once spend > max_budget (strictly), so the first call goes through and spends; a
+# later one must be refused once that spend reaches the team's counter (Redis, shared by all tasks)
+gen_team '{"team_alias":"smoke-t1-tiny-budget","max_budget":0.000001}'
+if [ -n "$GEN_TEAM" ]; then
+  gen_key "$(jq -nc --arg t "$GEN_TEAM" --arg m "$DEFAULT_MODEL" '{team_id:$t,models:[$m]}')"
+  if [ -n "$GEN_KEY" ]; then
+    codes=""; t0=$(date +%s)
+    for _ in $(seq 1 18); do
+      req POST "$BASE/v1/chat/completions" "$GEN_KEY" "$(chat_json "$DEFAULT_MODEL" "$(fresh_prompt)")"; codes="$codes$CODE "
+      [[ "$CODE" =~ ^4(00|29)$ ]] && body | grep -qi budget && break; sleep 5
+    done
+    [[ "$CODE" =~ ^4(00|29)$ ]] && body | grep -qi budget && pass "team over budget refused after $(( $(date +%s) - t0 ))s (codes: $codes)" ||
+      fail "team over budget still served after 90s (codes: $codes) $(body | head -c 150)"
+  else fail "could not create a key in the team"; fi
+else fail "could not create team: $CODE $(body | head -c 200)"; fi
+
+CURRENT=T2
+gen_team '{"team_alias":"smoke-t2-spend","max_budget":10}'
+if [ -n "$GEN_TEAM" ]; then
+  gen_key "$(jq -nc --arg t "$GEN_TEAM" --arg m "$DEFAULT_MODEL" '{team_id:$t,models:[$m]}')"
+  req POST "$BASE/v1/chat/completions" "$GEN_KEY" "$(chat_json "$DEFAULT_MODEL" "$(fresh_prompt)")"; c=$CODE
+  spend=0
+  for _ in $(seq 1 18); do
+    req GET "$BASE/team/info?team_id=$GEN_TEAM" "$MASTER_KEY"
+    spend=$(body | jq -r '.team_info.spend // 0' 2>/dev/null)
+    awk "BEGIN{exit !($spend > 0)}" && break; sleep 5
+  done
+  [ "$c" = 200 ] && awk "BEGIN{exit !($spend > 0)}" && pass "team key allowed under budget; team spend \$$spend" || fail "call -> $c, team spend $spend after 90s"
+else fail "could not create team: $CODE $(body | head -c 200)"; fi
+
 CURRENT=K5
 gen_key "$(jq -nc --arg m "$DEFAULT_MODEL" '{models:[$m],rpm_limit:1,key_alias:("smoke-rpm-"+(now|tostring))}')"; RKEY=$GEN_KEY
 if [ -n "$RKEY" ]; then
@@ -384,6 +445,18 @@ if [ -z "${ALARM_EMAIL:-}" ]; then skip "ALARM_EMAIL not set"; else
   elif [ "$sub" = PendingConfirmation ]; then fail "alarm $(jq -r .StateValue <<<"$alarm"), but the email subscription is unconfirmed: click the link in the AWS Notifications email"
   elif [[ "$sub" == arn:aws:sns:* ]]; then pass "alarm $(jq -r .StateValue <<<"$alarm") at $(jq -r .Threshold <<<"$alarm" | cut -d. -f1) tokens/h, email subscription confirmed"
   else fail "no email subscription on $topic"; fi
+fi
+
+CURRENT=X3
+if [ -z "${ALARM_EMAIL:-}" ] || [ "${HEALTH_ALARMS:-true}" != true ]; then skip "ALARM_EMAIL not set or HEALTH_ALARMS off"; else
+  # 2 ALB 5xx + 2 per target group (litellm, middleware) + 3 RDS + 1 per Valkey node
+  want=$((2 + 4 + 3 + ${REDIS_NUM_CACHE_CLUSTERS:-1}))
+  alarms=$(aws cloudwatch describe-alarms --alarm-name-prefix "${MAIN_STACK_NAME}-" --output json 2>/dev/null |
+    jq -c '[.MetricAlarms[] | select(.Namespace != null and .Namespace != "AWS/Bedrock" and (.AlarmActions | length) > 0)]')
+  n=$(jq length <<<"$alarms"); bad=$(jq -r '[.[] | select(.StateValue == "ALARM") | .AlarmName] | join(", ")' <<<"$alarms")
+  if [ "$n" -ne "$want" ]; then fail "$n health alarms with an SNS action, expected $want"
+  elif [ -n "$bad" ]; then fail "in ALARM: $bad"
+  else pass "$n health alarms wired to SNS, none in ALARM"; fi
 fi
 
 echo
