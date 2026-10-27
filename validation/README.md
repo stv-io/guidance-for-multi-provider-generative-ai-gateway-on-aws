@@ -59,7 +59,7 @@ of a cent; `ALL_MODELS=1` costs a few cents.
 | **K2** | Keys | A virtual key can call its allowed model | Chat with the K1 key on the default model returns 200 |
 | **K3** | Keys | Model restrictions are enforced | The K1 key on a model outside its list is rejected (401/403) |
 | **K4** | Keys | Spend is tracked (Postgres write path) | `GET /key/info` for the K1 key shows `spend > 0` within 90 s |
-| **T1** | Teams | Team budgets are enforced | A key in a team with `max_budget: 0.000001` is refused (400/429, "budget") within 90 s of its first call. LiteLLM refuses only once spend exceeds the budget, so the first call goes through |
+| **T1** | Teams | Team budgets are enforced | A key in a team with `max_budget: 0.000001` is refused (LiteLLM 1.106 answers 422, "Budget has been exceeded") within 90 s of its first call. LiteLLM refuses only once spend exceeds the budget, so the first call goes through |
 | **T2** | Teams | Team spend is tracked | A key in a team with budget left gets 200, and `/team/info` shows `spend > 0` within 90 s |
 | **K5** | Keys | Rate limits are enforced (Valkey shared state) | A key with `rpm_limit: 1` gets 429 on its second request within the minute |
 | **K7** | Keys | Only admins can mint keys (middleware gate) | `POST /key/generate` with the non-admin K1 key returns 403 (runs before K6) |

@@ -356,9 +356,9 @@ if [ -n "$GEN_TEAM" ]; then
     codes=""; t0=$(date +%s)
     for _ in $(seq 1 18); do
       req POST "$BASE/v1/chat/completions" "$GEN_KEY" "$(chat_json "$DEFAULT_MODEL" "$(fresh_prompt)")"; codes="$codes$CODE "
-      [[ "$CODE" =~ ^4(00|29)$ ]] && body | grep -qi budget && break; sleep 5
+      [[ "$CODE" =~ ^4[0-9][0-9]$ ]] && body | grep -qi "budget has been exceeded" && break; sleep 5
     done
-    [[ "$CODE" =~ ^4(00|29)$ ]] && body | grep -qi budget && pass "team over budget refused after $(( $(date +%s) - t0 ))s (codes: $codes)" ||
+    [[ "$CODE" =~ ^4[0-9][0-9]$ ]] && body | grep -qi "budget has been exceeded" && pass "team over budget refused with $CODE after $(( $(date +%s) - t0 ))s (codes: $codes)" ||
       fail "team over budget still served after 90s (codes: $codes) $(body | head -c 150)"
   else fail "could not create a key in the team"; fi
 else fail "could not create team: $CODE $(body | head -c 200)"; fi
