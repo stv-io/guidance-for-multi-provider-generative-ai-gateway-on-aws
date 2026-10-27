@@ -40,11 +40,14 @@ cat .env.template envs/sandbox.env > .env     # later lines win
 # set TERRAFORM_S3_BUCKET_NAME in .env (globally unique; created if missing)
 rm -f config/config.yaml                      # regenerate from the model lists
 AWS_PROFILE=sandbox ./deploy.sh               # plans each stack, asks before applying
-AWS_PROFILE=sandbox ./validation/smoke.sh     # 38 end-to-end checks
+AWS_PROFILE=sandbox ./validation/smoke.sh     # 43 end-to-end checks
 ```
 
 `deploy.sh` writes each Terraform plan to a file, shows it, and applies that
-exact plan only after you type `y`, or when `AUTO_APPROVE=true` is set (for CI). The
+exact plan only after you type `y`, or when `AUTO_APPROVE=true` is set (for CI). A plan
+with no changes is skipped. Run without a terminal, it stops at the first plan with changes
+and keeps it as `tfplan` in that stack's folder: review it with `terraform show tfplan`,
+apply it with `terraform apply tfplan`, and rerun `deploy.sh` to continue. The
 service URL ends up in `litellm-terraform-stack/resources.txt`.
 
 The master key is stored in Secrets Manager, in the secret whose name starts with
