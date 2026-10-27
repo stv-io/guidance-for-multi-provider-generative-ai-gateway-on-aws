@@ -143,11 +143,10 @@ elif [ "$n_nat" = "$want_nat" ] && [ "$nat_azs" = "$want_nat" ]; then pass "$n_n
 else fail "NAT gateways=$n_nat in $nat_azs AZs, want $want_nat"; fi
 
 CURRENT=I7
-# The proxy reports its version in the OpenAPI document (absent when DISABLE_SWAGGER_PAGE=true)
-req GET "$BASE/openapi.json" "$MASTER_KEY"
-running=$(body | jq -r '.info.version // empty' 2>/dev/null)
-if [ "$CODE" = 404 ]; then skip "OpenAPI document disabled"
-elif [ "$CODE" = 200 ] && [ "v$running" = "$LITELLM_VERSION" ]; then pass "LiteLLM $running (pinned ${LITELLM_IMAGE_DIGEST:0:19}…)"
+# The authenticated readiness details report the running version (the public /health/readiness doesn't)
+req GET "$BASE/health/readiness/details" "$MASTER_KEY"
+running=$(body | jq -r '.litellm_version // empty' 2>/dev/null)
+if [ "$CODE" = 200 ] && [ "v$running" = "$LITELLM_VERSION" ]; then pass "LiteLLM $running (pinned ${LITELLM_IMAGE_DIGEST:0:19}…)"
 else fail "$CODE running=v$running want $LITELLM_VERSION"; fi
 
 # ---------------------------------------------------------------- Edge
@@ -205,6 +204,15 @@ if [ -n "$CF_ID" ]; then
     pass "edge ACL attached, malicious header -> 403 (regional ALB ACL: ${regional:-none})"
   else fail "WebACLId=${acl:-none} malicious header -> $CODE"; fi
 else skip "CloudFront not in use"; fi
+
+CURRENT=E9
+docs=""; for p in / /redoc /openapi.json; do
+  docs+="$p=$(curl -s -o /dev/null -w '%{http_code}' "$BASE$p" --max-time 20) "
+done
+if [ "${DISABLE_SWAGGER_PAGE:-false}" != true ]; then skip "DISABLE_SWAGGER_PAGE=false: ${docs% }"
+# With the docs off, / falls through to LiteLLM's authenticated home route (401)
+elif [[ "$docs" =~ ^/=(401|404)\ /redoc=404\ /openapi.json=404\ $ ]]; then pass "API docs hidden: ${docs% }"
+else fail "API docs still served: ${docs% }"; fi
 
 # ---------------------------------------------------------------- Auth
 echo "== Auth"

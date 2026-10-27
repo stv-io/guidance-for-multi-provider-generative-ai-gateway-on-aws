@@ -31,7 +31,7 @@ of a cent; `ALL_MODELS=1` costs a few cents.
 | **I4** | Infra | Service is healthy on Graviton | ECS service `runningCount == desiredCount`, task `cpuArchitecture == ARM64`, every container `HEALTHY` |
 | **I5** | Infra | Cost profile: no interface endpoints | The stack VPC has no `Interface` VPC endpoints when outbound access is enabled, and does have the S3 `Gateway` endpoint |
 | **I6** | Infra | Egress matches the profile | `NAT_GATEWAY_PER_AZ=true`: 2 available NAT gateways in 2 AZs; otherwise 1 |
-| **I7** | Infra | The pinned LiteLLM version is running | `GET /openapi.json` reports `info.version` equal to `LITELLM_VERSION` (the build itself refuses an image whose tag no longer matches `LITELLM_IMAGE_DIGEST` or whose cosign signature fails) |
+| **I7** | Infra | The pinned LiteLLM version is running | `GET /health/readiness/details` (master key) reports `litellm_version` equal to `LITELLM_VERSION` (the build itself refuses an image whose tag no longer matches `LITELLM_IMAGE_DIGEST` or whose cosign signature fails) |
 | **E1** | Edge | ALB is locked to CloudFront | VPC origin (default): the ALB scheme is `internal` and it cannot be reached from the internet. Public ALB: a request without the CloudFront secret header gets 403 |
 | **E2** | Edge | HTTP is upgraded | `http://<cloudfront>/` redirects (301/302/307/308) to HTTPS |
 | **E3** | Edge | LiteLLM is reachable through CloudFront | `GET /health/liveliness` returns 200 |
@@ -40,6 +40,7 @@ of a cent; `ALL_MODELS=1` costs a few cents.
 | **E6** | Edge | CloudFront → ALB is encrypted | With a custom domain and a VPC origin: the VPC origin's protocol policy is `https-only` |
 | **E7** | Edge | Custom domain works | The service URL is `https://RECORD_NAME.HOSTED_ZONE_NAME`, it has A and AAAA records, and `/health/liveliness` returns 200 with certificate verification on |
 | **E8** | Edge | Edge WAF is active | The distribution has a CLOUDFRONT-scope web ACL, and a request with a Log4Shell-style header (`${jndi:…}`) gets 403 |
+| **E9** | Edge | Unauthenticated API docs are hidden | With `DISABLE_SWAGGER_PAGE=true`: `/redoc` and `/openapi.json` return 404, and `/` no longer serves Swagger UI (401: LiteLLM's authenticated home route) |
 | **A1** | Auth | Unauthenticated calls are refused | `GET /v1/models` without a key returns 401 |
 | **A2** | Auth | Bogus keys are refused | `GET /v1/models` with `sk-invalid…` returns 401 |
 | **A3** | Auth | Model list is Bedrock-only | `GET /v1/models` with the master key lists exactly the models in `config/config.yaml` |

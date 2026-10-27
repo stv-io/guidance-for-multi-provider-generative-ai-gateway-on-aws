@@ -40,7 +40,7 @@ cat .env.template envs/sandbox.env > .env     # later lines win
 # set TERRAFORM_S3_BUCKET_NAME in .env (globally unique; created if missing)
 rm -f config/config.yaml                      # regenerate from the model lists
 AWS_PROFILE=sandbox ./deploy.sh               # plans each stack, asks before applying
-AWS_PROFILE=sandbox ./validation/smoke.sh     # 43 end-to-end checks
+AWS_PROFILE=sandbox ./validation/smoke.sh     # 44 end-to-end checks
 ```
 
 `deploy.sh` writes each Terraform plan to a file, shows it, and applies that
@@ -91,7 +91,7 @@ so a new account starts from empty state.
    - The master key is in the Secrets Manager secret `LiteLLMMasterSalt-*`, field
      `LITELLM_MASTER_KEY`.
    - Admin UI: `https://<service-url>/ui/`, user `admin`, the master key as the password.
-     API reference (Swagger): `https://<service-url>/`.
+     API reference: hidden by default (`DISABLE_SWAGGER_PAGE`); see LiteLLM's hosted docs.
 
 When reusing a checkout, `terraform plan` can fail with *cached package … does not match
 the checksums in the lock file*. Run `terraform init -backend-config=backend.hcl` in both
@@ -139,6 +139,7 @@ so the environments never share state even if they share a bucket.
 | `ECS_CPU_TARGET_UTILIZATION_PERCENTAGE` | `50` | Autoscaling target on average CPU |
 | `HEALTH_ALARMS`, `HEALTH_ALARM_NOTIFICATIONS`, `ALB_5XX_ALARM_COUNT`, `RDS_CONNECTIONS_ALARM` | `true`, `false`, `10`, `60` (production `300`) | Health alarms: ALB 5xx, no healthy or some unhealthy targets, RDS CPU, free storage and connections, Valkey memory. They only change state in CloudWatch unless `HEALTH_ALARM_NOTIFICATIONS=true`, which emails them (and their return to OK) to `ALARM_EMAIL` |
 | `ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE` | `0` (off) | Optional second target on memory. LiteLLM idles at about 45% of a 2 GB task and its memory doesn't follow load, while target tracking assumes it does, so any memory target keeps an extra task running. Leave it off unless memory pressure is the real limit |
+| `DISABLE_SWAGGER_PAGE` | `true` | Hides the unauthenticated API docs: Swagger UI at `/`, `/redoc` and `/openapi.json`. The Admin UI's API reference view needs `/openapi.json` and stops working; the rest of the UI doesn't use it |
 | `STACK_ENV` | empty | State key prefix; empty keeps the upstream state keys |
 | `AUTO_APPROVE` | `false` | Apply plans without the prompt |
 
