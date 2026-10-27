@@ -124,3 +124,13 @@ output "litellm_master_key" {
 output "litellm_salt_key" {
   value = local.litellm_salt_key
 }
+
+output "rds_identifier" {
+  description = "RDS instance identifier (the DBInstanceIdentifier dimension of AWS/RDS metrics)"
+  value       = aws_db_instance.database.identifier
+}
+
+output "redis_replication_group_id" {
+  description = "ElastiCache replication group ID; its nodes are <id>-001, <id>-002, ... (the CacheClusterId dimension)"
+  value       = aws_elasticache_replication_group.redis.replication_group_id
+}

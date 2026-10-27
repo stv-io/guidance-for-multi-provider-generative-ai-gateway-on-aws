@@ -403,6 +403,9 @@ export TF_VAR_nat_gateway_per_az=${NAT_GATEWAY_PER_AZ:-false}
 export TF_VAR_alarm_email=${ALARM_EMAIL:-}
 export TF_VAR_bedrock_monthly_budget_usd=${BEDROCK_MONTHLY_BUDGET_USD:-100}
 export TF_VAR_bedrock_tokens_per_hour_alarm=${BEDROCK_TOKENS_PER_HOUR_ALARM:-2000000}
+export TF_VAR_health_alarms=${HEALTH_ALARMS:-true}
+export TF_VAR_alb_5xx_alarm_count=${ALB_5XX_ALARM_COUNT:-10}
+export TF_VAR_rds_connections_alarm=${RDS_CONNECTIONS_ALARM:-60}
 
 # Display CloudFront and Route53 configuration
 echo "USE_ROUTE53: $USE_ROUTE53"
