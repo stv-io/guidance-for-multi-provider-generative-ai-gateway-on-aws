@@ -70,6 +70,28 @@ of a cent; `ALL_MODELS=1` costs a few cents.
 | **X3** | Health | Health alarms exist and are quiet | `2 + 4 + 3 + REDIS_NUM_CACHE_CLUSTERS` CloudWatch alarms named `<stack>-…`, none in `ALARM`; they have the SNS action only when `HEALTH_ALARM_NOTIFICATIONS=true` and `ALARM_EMAIL` is set (skipped with `HEALTH_ALARMS=false`) |
 | **S1** | Security | Secrets are not logged | The last 30 min of the LiteLLM and middleware CloudWatch log groups contain neither the master key nor the K1 key |
 
+## Performance and resilience tests
+
+Run these by hand after the smoke tests pass. They aren't part of `smoke.sh` because they
+take longer, and the alarm test takes the gateway down. Each writes its results to
+`validation/results/`.
+
+| Script | What it shows | Pass when | Time and cost |
+|--------|---------------|-----------|---------------|
+| `scripts/latency-overhead.py` | Latency the gateway adds over calling Bedrock directly (PoC criterion 4). Sends the same short non-streaming prompt both ways, alternating, with the response cache bypassed. Also reports LiteLLM's own `x-litellm-overhead-duration-ms` | The p95 of the per-request difference (gateway minus direct, for the same prompt) is under 300 ms. This is stricter than subtracting the two p95s, which the script also reports | About 3 minutes; under $0.05 on Haiku 4.5 |
+| `scripts/load-test.py` | Autoscaling. Holds concurrent requests open until average CPU passes `ECS_CPU_TARGET_UTILIZATION_PERCENTAGE`, then stops and watches the service shrink back | The service scales out and back to its minimum, with errors under 1% | About 30 minutes, mostly waiting for scale-in (target tracking waits 15 minutes below target). No Bedrock cost: requests use LiteLLM's `mock_response`, which runs everything except the model call. LiteLLM honours it only for keys with `allow_client_mock_response: true` in their metadata, which the script sets on its temporary key. `--real` sends real calls |
+| `scripts/alarm-test.sh` | **Disruptive.** Part 1 stops the task (a crash) and times the recovery. Part 2 scales the service to 0 until `<stack>-litellm-no-healthy-targets` fires, then restores it and times the return to OK | The alarm fires during the outage and clears after it | About 15 minutes, several of them with the gateway down |
+
+```bash
+AWS_PROFILE=sandbox uv run python scripts/latency-overhead.py -n 50
+AWS_PROFILE=sandbox uv run python scripts/load-test.py --concurrency 40 --duration 8
+AWS_PROFILE=sandbox scripts/alarm-test.sh
+```
+
+The edge WAF allows `CLOUDFRONT_WAF_RATE_LIMIT` requests per IP per 5 minutes (2000, about
+7 a second). That's too few to load a task from one machine, so raise it in `.env` and
+redeploy before the load test, then set it back.
+
 ## Adding tests
 
 Each test is a function in `smoke.sh` named after its ID that calls `pass`, `fail`

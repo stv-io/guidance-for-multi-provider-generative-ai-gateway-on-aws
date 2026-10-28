@@ -2,7 +2,7 @@
 
 Where the work stopped, and what to do next, in order.
 
-## Where it stands (2026-10-27)
+## Where it stands (2026-10-28)
 
 - `main` has everything: the phase 1 hardening, plus phase 2 (PR #2): health alarms, log
   hygiene, the LiteLLM upgrade routine with the provenance check, LiteLLM v1.106.4 with the
@@ -38,15 +38,18 @@ subscription per account. The gateway's task role can't subscribe (no
   subscribes the account, then rerun M5; or
 - remove the two models from `config/` for the EU regions.
 
-## 3. Tests not yet run (phase 3)
+## 3. Phase 3 tests (run 2026-10-28)
 
-| # | Test | How | Pass when |
-|---|------|-----|-----------|
-| 1 | Claude Code through the gateway | `ANTHROPIC_BASE_URL=https://<service-url>`, `ANTHROPIC_AUTH_TOKEN=<virtual key>`, `ANTHROPIC_MODEL=eu.anthropic.claude-sonnet-4-6`, `ANTHROPIC_DEFAULT_HAIKU_MODEL=eu.anthropic.claude-haiku-4-5-20251001-v1:0` | A real session works; spend shows on the key. M7/M7b already cover the API path |
-| 2 | Latency overhead (PoC criterion 4) | `scripts/benchmark.py` against the gateway and against Bedrock directly | p95 overhead under 300 ms, non-streaming |
-| 3 | Scale-out | Load above the 50% CPU target | The service grows from 1 to 2 tasks and back, with no errors. A few dollars of Haiku |
-| 4 | Health alarm | Stop the task | The no-healthy-targets alarm goes to ALARM in CloudWatch, then back to OK |
-| 5 | Admin UI by hand | Log in as `admin` with the master key; create a key and a team with a budget | Spend per key and team shows after use |
+| Test | Result |
+|------|--------|
+| Latency overhead (`scripts/latency-overhead.py`, Haiku 4.5, n=50) | **Pass.** Per-request difference p50 +61 ms, p95 +191 ms (target < 300 ms). LiteLLM's own overhead p50 16 ms, p95 30 ms; the rest is CloudFront and the middleware hop |
+| Scale-out (`scripts/load-test.py`, mocked responses) | **Pass.** 17,190 requests, 0 errors. Out to 2 tasks after 275 s, back to 1 about 17 minutes after the load stopped. One 1-vCPU task serves ~27 requests a second |
+| Health alarm (`scripts/alarm-test.sh`) | **Pass after a fix.** A crashed task was replaced in ~110 s without alarming (shorter than the 3-minute rule). A full outage first alarmed only after ~10 minutes, because the ALB publishes no data with no targets; the alarm now uses `FILL(HealthyHostCount, 0)` and fired after ~6 minutes |
+| Claude Code | **Pass.** A real session through the gateway with an Admin-UI key: wrote a test, fixed the bug, ran the tests; spend shows on the key and team |
+| Admin UI | **Pass.** Team with models and a monthly budget, a key inside it with its own budget and rpm limit, spend by key and team, request logs |
+
+Screen recordings of the admin and engineer journeys were made with `vhs` (terminal) and
+Playwright (Admin UI, key text blurred). They are not in the repo.
 
 ## 4. Decision: run the PoC
 
@@ -60,6 +63,11 @@ From [`decisions.md`](decisions.md) → *Open items*:
 
 - **D3**: OIDC (Google) sign-in for `/user/new`.
 - **TODO-2**: a scheduled LiteLLM upgrade check.
+- Admin UI sign-in: create named admin users or SSO, then set
+  `general_settings.disable_env_credential_login: true` (LiteLLM warns that master-key sign-in is
+  a shared static secret).
+- Faster outage detection, if 6 minutes is too slow: a synthetic check (Route 53 health check or
+  CloudWatch Synthetics) on `/health/liveliness`.
 - A production-profile deploy (`envs/production.env`, own account), with AZ-loss, database
   failover and backup-restore tests.
 - Langfuse tracing.

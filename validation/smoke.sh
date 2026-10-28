@@ -463,7 +463,7 @@ if [ "${HEALTH_ALARMS:-true}" != true ]; then skip "HEALTH_ALARMS off"; else
   want=$((2 + 4 + 3 + ${REDIS_NUM_CACHE_CLUSTERS:-1}))
   notify=$([ "${HEALTH_ALARM_NOTIFICATIONS:-false}" = true ] && [ -n "${ALARM_EMAIL:-}" ] && echo true || echo false)
   alarms=$(aws cloudwatch describe-alarms --alarm-name-prefix "${MAIN_STACK_NAME}-" --output json 2>/dev/null |
-    jq -c '[.MetricAlarms[] | select(.Namespace != null and .Namespace != "AWS/Bedrock")]')
+    jq -c '[.MetricAlarms[] | select((.AlarmName | endswith("-bedrock-tokens-per-hour")) | not)]')
   n=$(jq length <<<"$alarms")
   wired=$(jq '[.[] | select((.AlarmActions | length) > 0)] | length' <<<"$alarms")
   bad=$(jq -r '[.[] | select(.StateValue == "ALARM") | .AlarmName] | join(", ")' <<<"$alarms")
