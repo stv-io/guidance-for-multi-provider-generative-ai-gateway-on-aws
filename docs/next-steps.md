@@ -2,16 +2,16 @@
 
 Where the work stopped, and what to do next, in order.
 
-## Where it stands (2026-10-28)
+## Where it stands (2026-10-29)
 
-- `main` has everything: the phase 1 hardening, plus phase 2 (PR #2): health alarms, log
-  hygiene, the LiteLLM upgrade routine with the provenance check, LiteLLM v1.106.4 with the
-  rotated signing key, hidden API docs, and new smoke tests.
-- The sandbox was redeployed on 2026-10-27 from the *Redeploy* checklist, tested, and torn down
-  the same day. What remains in the account: the Terraform state bucket and the
-  `sandbox.myops-lab.cloud` hosted zone.
-- Last smoke run before the teardown: **43 pass, 1 fail** of 44. The failure is M5 for
-  `eu.anthropic.claude-haiku-5-5` and `eu.anthropic.claude-sonnet-5-5` (403), see step 2.
+- `main` has everything: the phase 1 hardening, phase 2 (PR #2: health alarms, log hygiene,
+  the LiteLLM upgrade routine with the provenance check, hidden API docs, new smoke tests) and
+  phase 3 (PR #3: the performance and resilience test scripts, the faster outage alarm,
+  LiteLLM v1.106.5).
+- The sandbox was redeployed on 2026-10-28, tested, and torn down on 2026-10-29. What remains
+  in the account: the Terraform state bucket, the `sandbox.myops-lab.cloud` hosted zone, and
+  the Marketplace agreements for the Claude 5.5 models (account-level, no standing cost).
+- Last smoke run before the teardown (`ALL_MODELS=1`): **44 pass** of 44.
 
 ## 1. Bring the sandbox back (about 30 minutes)
 
@@ -23,20 +23,20 @@ Where the work stopped, and what to do next, in order.
 3. `AWS_PROFILE=sandbox ./deploy.sh`. Off a terminal it stops after each plan with changes and
    keeps it as `tfplan`: review it, `terraform apply tfplan`, rerun `deploy.sh`. A fresh deploy
    is about 110 resources in the main stack and 4 in the log-bucket stack.
-4. Confirm the SNS subscription email, then
+4. Confirm the SNS subscription email (a new one is sent on every deploy), then
    `AWS_PROFILE=sandbox ALL_MODELS=1 ./validation/smoke.sh`.
 
 See [`deployment.md`](deployment.md) → *Deploy the sandbox* for detail.
 
-## 2. Decision: the Claude 5.5 models
+## 2. The Claude 5.5 models (done 2026-10-29)
 
 Bedrock serves `claude-haiku-5-5` and `claude-sonnet-5-5` only after a one-time AWS Marketplace
-subscription per account. The gateway's task role can't subscribe (no
-`aws-marketplace:Subscribe`), so M5 fails with 403. Either:
-
-- send one prompt to each model from the Bedrock console playground (eu-west-1), which
-  subscribes the account, then rerun M5; or
-- remove the two models from `config/` for the EU regions.
+agreement per account; the gateway's task role can't create it (no `aws-marketplace:Subscribe`).
+The sandbox account now has both, accepted with
+`aws bedrock create-foundation-model-agreement` (offer token from
+`list-foundation-model-agreement-offers`). It took about a minute to become `AVAILABLE`, and
+the gateway kept returning 403 for a few minutes after that. A new account (production) needs
+the same step, or one prompt to each model in the Bedrock console playground.
 
 ## 3. Phase 3 tests (run 2026-10-28)
 
