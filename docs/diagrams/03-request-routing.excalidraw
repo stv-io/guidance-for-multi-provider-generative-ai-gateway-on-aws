@@ -387,14 +387,14 @@
       "y": 185,
       "strokeColor": "#495057",
       "roughness": 0,
-      "text": "TLS · regional ACM certificate for llm.sandbox.myops-lab.cloud",
+      "text": "TLS · regional ACM certificate for llm.sandbox.example.com",
       "fontSize": 13,
       "fontFamily": 2,
       "textAlign": "left",
       "createdAt": "2026-10-22T07:40:15.182Z",
       "updatedAt": "2026-10-22T07:40:15.182Z",
       "version": 1,
-      "originalText": "TLS · regional ACM certificate for llm.sandbox.myops-lab.cloud"
+      "originalText": "TLS · regional ACM certificate for llm.sandbox.example.com"
     },
     {
       "id": "rt-t-23",

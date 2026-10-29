@@ -8,7 +8,7 @@ different environment profile. Diagrams are in [`docs/diagrams/`](diagrams/READM
 
 | Layer | Sandbox (`envs/sandbox.env`) | Production (`envs/production.env`) |
 |---|---|---|
-| Entry | CloudFront on `https://llm.sandbox.myops-lab.cloud` (A + AAAA alias), edge WAF | CloudFront on `RECORD_NAME.HOSTED_ZONE_NAME`, edge WAF |
+| Entry | CloudFront on `https://llm.sandbox.example.com` (A + AAAA alias), edge WAF | CloudFront on `RECORD_NAME.HOSTED_ZONE_NAME`, edge WAF |
 | Certificates | requested and DNS-validated by the stack: us-east-1 (CloudFront) + eu-west-1 (ALB) | same, or bring your own ARNs |
 | CloudFront → ALB | VPC origin to an **internal** ALB over **HTTPS**; traffic stays on the AWS network | same |
 | ALB | private subnets, SG admits only the CloudFront origin-facing prefix list, TLS 1.3 policy, forwards only requests with the CloudFront secret header | same |
@@ -38,6 +38,7 @@ different environment profile. Diagrams are in [`docs/diagrams/`](diagrams/READM
 ```bash
 cat .env.template envs/sandbox.env > .env     # later lines win
 # set TERRAFORM_S3_BUCKET_NAME in .env (globally unique; created if missing)
+# set HOSTED_ZONE_NAME and ALARM_EMAIL in .env (kept out of git: this repo is public)
 rm -f config/config.yaml                      # regenerate from the model lists
 AWS_PROFILE=sandbox ./deploy.sh               # plans each stack, asks before applying
 AWS_PROFILE=sandbox ./validation/smoke.sh     # 44 end-to-end checks
@@ -128,7 +129,7 @@ so the environments never share state even if they share a bucket.
 | Variable | Default | Effect |
 |---|---|---|
 | `CLOUDFRONT_VPC_ORIGIN` | `true` | Internal ALB behind a CloudFront VPC origin. `false` restores the upstream design: public ALB, plain HTTP from CloudFront over the internet, guarded only by a secret header |
-| `USE_ROUTE53`, `HOSTED_ZONE_NAME`, `RECORD_NAME` | sandbox: `llm` in `sandbox.myops-lab.cloud` | Custom domain; also switches the CloudFront → ALB hop to HTTPS |
+| `USE_ROUTE53`, `HOSTED_ZONE_NAME`, `RECORD_NAME` | sandbox: `llm` in `sandbox.example.com` | Custom domain; also switches the CloudFront → ALB hop to HTTPS |
 | `CLOUDFRONT_WAF`, `CLOUDFRONT_WAF_RATE_LIMIT` | `true`, `2000` | Edge web ACL and its per-IP limit (requests per 5 minutes). Behind a VPC origin it replaces the regional ACL on the ALB |
 | `NAT_GATEWAY_PER_AZ` | `false` (production `true`) | One NAT gateway per AZ, about $35/month more per extra NAT plus data |
 | `LITELLM_VERSION`, `LITELLM_IMAGE_DIGEST` | `v1.106.5`, its index digest | The build refuses an image whose tag has moved, whose cosign signature fails against `config/litellm-cosign.pub`, or whose provenance isn't `BerriAI/litellm` at the tag's commit. Change them with `scripts/litellm-bump.sh` (see *Upgrading LiteLLM*) |

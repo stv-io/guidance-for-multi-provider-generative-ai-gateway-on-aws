@@ -401,14 +401,14 @@
       "y": 298,
       "strokeColor": "#1e1e1e",
       "roughness": 0,
-      "text": "Entry · llm.sandbox.myops-lab.cloud",
+      "text": "Entry · llm.sandbox.example.com",
       "fontSize": 13,
       "fontFamily": 2,
       "textAlign": "left",
       "createdAt": "2026-10-22T07:41:46.981Z",
       "updatedAt": "2026-10-22T07:41:46.981Z",
       "version": 1,
-      "originalText": "Entry · llm.sandbox.myops-lab.cloud"
+      "originalText": "Entry · llm.sandbox.example.com"
     },
     {
       "id": "env-t-22",

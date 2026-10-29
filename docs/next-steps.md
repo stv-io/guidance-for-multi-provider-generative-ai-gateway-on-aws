@@ -9,7 +9,7 @@ Where the work stopped, and what to do next, in order.
   phase 3 (PR #3: the performance and resilience test scripts, the faster outage alarm,
   LiteLLM v1.106.5).
 - The sandbox was redeployed on 2026-10-28, tested, and torn down on 2026-10-29. What remains
-  in the account: the Terraform state bucket, the `sandbox.myops-lab.cloud` hosted zone, and
+  in the account: the Terraform state bucket, the `sandbox.example.com` hosted zone, and
   the Marketplace agreements for the Claude 5.5 models (account-level, no standing cost).
 - Last smoke run before the teardown (`ALL_MODELS=1`): **44 pass** of 44.
 
@@ -19,7 +19,7 @@ Where the work stopped, and what to do next, in order.
    line and refuses images that fail the digest, signature or provenance checks. Read the
    release notes it lists. Commit the change on a branch.
 2. Build `.env`: `cat .env.template envs/sandbox.env > .env`, then set
-   `TERRAFORM_S3_BUCKET_NAME` and `ALARM_EMAIL` (both stay out of git).
+   `TERRAFORM_S3_BUCKET_NAME`, `HOSTED_ZONE_NAME` and `ALARM_EMAIL` (all stay out of git).
 3. `AWS_PROFILE=sandbox ./deploy.sh`. Off a terminal it stops after each plan with changes and
    keeps it as `tfplan`: review it, `terraform apply tfplan`, rerun `deploy.sh`. A fresh deploy
    is about 110 resources in the main stack and 4 in the log-bucket stack.
