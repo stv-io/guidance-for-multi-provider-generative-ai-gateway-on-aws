@@ -1,7 +1,7 @@
 # Architecture diagrams
 
 Diagrams of the ECS deployment of `litellm-terraform-stack` as configured on the
-`sandbox-deploy` branch (eu-west-1, own domain `llm.sandbox.myops-lab.cloud`, edge WAF on CloudFront, CloudFront VPC origin to an internal ALB over HTTPS). They are drawn from
+`sandbox-deploy` branch (eu-west-1, own domain `llm.sandbox.example.com`, edge WAF on CloudFront, CloudFront VPC origin to an internal ALB over HTTPS). They are drawn from
 the Terraform and middleware code, not from a live account. Drawn 2026-10-22; updated the same day for the HTTPS origin, edge WAF, own domain, per-AZ NAT and CPU-only scaling.
 
 | Diagram | What it shows |

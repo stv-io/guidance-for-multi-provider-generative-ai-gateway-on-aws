@@ -8,13 +8,13 @@ different environment profile. Diagrams are in [`docs/diagrams/`](diagrams/READM
 
 | Layer | Sandbox (`envs/sandbox.env`) | Production (`envs/production.env`) |
 |---|---|---|
-| Entry | CloudFront on `https://llm.sandbox.myops-lab.cloud` (A + AAAA alias), edge WAF | CloudFront on `RECORD_NAME.HOSTED_ZONE_NAME`, edge WAF |
+| Entry | CloudFront on `https://llm.sandbox.example.com` (A + AAAA alias), edge WAF | CloudFront on `RECORD_NAME.HOSTED_ZONE_NAME`, edge WAF |
 | Certificates | requested and DNS-validated by the stack: us-east-1 (CloudFront) + eu-west-1 (ALB) | same, or bring your own ARNs |
 | CloudFront → ALB | VPC origin to an **internal** ALB over **HTTPS**; traffic stays on the AWS network | same |
 | ALB | private subnets, SG admits only the CloudFront origin-facing prefix list, TLS 1.3 policy, forwards only requests with the CloudFront secret header | same |
 | WAF | CLOUDFRONT-scope web ACL: AWS common rules, known bad inputs, IP reputation, 2,000 requests / 5 min per IP | same |
 | Compute | ECS Fargate ARM64, 1 task × 1 vCPU / 2 GB (autoscale 1–2) | 2–6 tasks × 2 vCPU / 4 GB |
-| App | LiteLLM v1.106.4 pinned by digest, cosign- and provenance-verified (:4000), middleware (:3000), both in one task | same |
+| App | LiteLLM v1.106.5 pinned by digest, cosign- and provenance-verified (:4000), middleware (:3000), both in one task | same |
 | Database | RDS PostgreSQL 18, `db.t4g.micro`, single-AZ | `db.t4g.medium`, Multi-AZ, 50 GB |
 | Cache | ElastiCache Valkey 9.1, 1 × `cache.t4g.micro` | 2 × `cache.t4g.small`, Multi-AZ with automatic failover |
 | Network | new VPC, 2 public + 2 private subnets, 1 NAT gateway, S3 gateway endpoint | same, with one NAT gateway per AZ (`NAT_GATEWAY_PER_AZ=true`) |
@@ -38,6 +38,7 @@ different environment profile. Diagrams are in [`docs/diagrams/`](diagrams/READM
 ```bash
 cat .env.template envs/sandbox.env > .env     # later lines win
 # set TERRAFORM_S3_BUCKET_NAME in .env (globally unique; created if missing)
+# set HOSTED_ZONE_NAME and ALARM_EMAIL in .env (kept out of git: this repo is public)
 rm -f config/config.yaml                      # regenerate from the model lists
 AWS_PROFILE=sandbox ./deploy.sh               # plans each stack, asks before applying
 AWS_PROFILE=sandbox ./validation/smoke.sh     # 44 end-to-end checks
@@ -128,10 +129,10 @@ so the environments never share state even if they share a bucket.
 | Variable | Default | Effect |
 |---|---|---|
 | `CLOUDFRONT_VPC_ORIGIN` | `true` | Internal ALB behind a CloudFront VPC origin. `false` restores the upstream design: public ALB, plain HTTP from CloudFront over the internet, guarded only by a secret header |
-| `USE_ROUTE53`, `HOSTED_ZONE_NAME`, `RECORD_NAME` | sandbox: `llm` in `sandbox.myops-lab.cloud` | Custom domain; also switches the CloudFront → ALB hop to HTTPS |
+| `USE_ROUTE53`, `HOSTED_ZONE_NAME`, `RECORD_NAME` | sandbox: `llm` in `sandbox.example.com` | Custom domain; also switches the CloudFront → ALB hop to HTTPS |
 | `CLOUDFRONT_WAF`, `CLOUDFRONT_WAF_RATE_LIMIT` | `true`, `2000` | Edge web ACL and its per-IP limit (requests per 5 minutes). Behind a VPC origin it replaces the regional ACL on the ALB |
 | `NAT_GATEWAY_PER_AZ` | `false` (production `true`) | One NAT gateway per AZ, about $35/month more per extra NAT plus data |
-| `LITELLM_VERSION`, `LITELLM_IMAGE_DIGEST` | `v1.106.4`, its index digest | The build refuses an image whose tag has moved, whose cosign signature fails against `config/litellm-cosign.pub`, or whose provenance isn't `BerriAI/litellm` at the tag's commit. Change them with `scripts/litellm-bump.sh` (see *Upgrading LiteLLM*) |
+| `LITELLM_VERSION`, `LITELLM_IMAGE_DIGEST` | `v1.106.5`, its index digest | The build refuses an image whose tag has moved, whose cosign signature fails against `config/litellm-cosign.pub`, or whose provenance isn't `BerriAI/litellm` at the tag's commit. Change them with `scripts/litellm-bump.sh` (see *Upgrading LiteLLM*) |
 | `RDS_MULTI_AZ` | `true` (sandbox `false`) | RDS standby in a second AZ |
 | `REDIS_NUM_CACHE_CLUSTERS` | `2` (sandbox `1`) | >1 turns on Multi-AZ and automatic failover |
 | `INCLUDE_BASE_MODELS` | `true` (profiles `false`) | `false` loads only the region's Bedrock models, not the ~90 third-party entries in `default-config-base.yaml` |
@@ -238,6 +239,23 @@ AWS_PROFILE=sandbox ./undeploy.sh
   lags by hours, and a CloudWatch alarm on Bedrock tokens per hour, sent by email through SNS.
   Both count all Bedrock use in the account and region, not only the gateway's. The SNS
   subscription needs its confirmation email clicked once.
+- **Capacity (measured 2026-10-28, `scripts/load-test.py`).** One 1-vCPU task serves about
+  27 requests a second before requests queue (p95 latency rose to ~4.5 s). LiteLLM's own work
+  was measured with `mock_response`, so real model calls add their own time but not much CPU.
+  A second task doubled throughput to ~53 requests a second. Scale-out took 275 s from the start
+  of the load (3 minutes for the alarm, then the task start), and scale-in took ~17 minutes
+  after it. Size `MAX_CAPACITY` and the minimum for peaks you can't absorb for five minutes.
+- **A single task means a crash is an outage.** In the sandbox (1 task) a stopped task left the
+  gateway down for ~90 s until ECS replaced it, which is shorter than the 3 minutes the
+  no-healthy-targets alarm waits, so it is not alerted. Production runs at least 2 tasks.
+- **Rate limits count per calendar minute**, not over a rolling 60 s, so a key can send up to
+  twice its `rpm_limit` across a minute boundary.
+- **Admin UI sign-in uses the master key.** LiteLLM warns that this is a shared static secret
+  ("environment-credential login"). Before anyone else has admin access: create named admin
+  users (or SSO), then set `general_settings.disable_env_credential_login: true`.
+- **Keys created in the Admin UI as "AI APIs" keys** can call model routes only, not
+  `/key/info`, so an engineer can't look up their own spend with that key; the admin sees it in
+  the UI.
 - Decisions taken on this fork and why: [`decisions.md`](decisions.md).
 - See [`poc-success-criteria.md`](poc-success-criteria.md) for the PoC exit
   criteria and the items that block a customer pilot.

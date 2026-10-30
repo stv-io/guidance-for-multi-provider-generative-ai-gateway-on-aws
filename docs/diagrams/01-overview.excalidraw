@@ -136,14 +136,14 @@
       "y": 407,
       "strokeColor": "#495057",
       "roughness": 0,
-      "text": "llm.sandbox.myops-lab.cloud · ACM",
+      "text": "llm.sandbox.example.com · ACM",
       "fontSize": 11,
       "fontFamily": 2,
       "textAlign": "left",
       "createdAt": "2026-10-22T07:38:03.809Z",
       "updatedAt": "2026-10-22T07:38:03.809Z",
       "version": 1,
-      "originalText": "llm.sandbox.myops-lab.cloud · ACM"
+      "originalText": "llm.sandbox.example.com · ACM"
     },
     {
       "id": "ov-t-9",
@@ -1921,14 +1921,14 @@
       "y": 1048,
       "strokeColor": "#495057",
       "roughness": 0,
-      "text": "1 · client → CloudFront over HTTPS on llm.sandbox.myops-lab.cloud (Route 53 alias, ACM in us-east-1); edge WAF",
+      "text": "1 · client → CloudFront over HTTPS on llm.sandbox.example.com (Route 53 alias, ACM in us-east-1); edge WAF",
       "fontSize": 12,
       "fontFamily": 2,
       "textAlign": "left",
       "createdAt": "2026-10-22T07:38:03.818Z",
       "updatedAt": "2026-10-22T07:38:03.818Z",
       "version": 1,
-      "originalText": "1 · client → CloudFront over HTTPS on llm.sandbox.myops-lab.cloud (Route 53 alias, ACM in us-east-1); edge WAF"
+      "originalText": "1 · client → CloudFront over HTTPS on llm.sandbox.example.com (Route 53 alias, ACM in us-east-1); edge WAF"
     },
     {
       "id": "ov-t-100",

@@ -148,18 +148,33 @@ resource "aws_cloudwatch_metric_alarm" "no_healthy_targets" {
   for_each            = local.health_alarms ? local.target_groups : {}
   alarm_name          = "${var.name}-${each.key}-no-healthy-targets"
   alarm_description   = "No healthy ${each.key} target behind the ALB for 3 minutes: the gateway is down"
-  namespace           = "AWS/ApplicationELB"
-  metric_name         = "HealthyHostCount"
-  dimensions          = { LoadBalancer = module.ecs_cluster.alb_arn_suffix, TargetGroup = each.value }
-  statistic           = "Minimum"
-  period              = 60
   evaluation_periods  = 3
   threshold           = 1
   comparison_operator = "LessThanThreshold"
-  # No data points means no target reported at all
+  # With no targets the ALB publishes no HealthyHostCount at all, and CloudWatch took ~10 minutes
+  # to treat that gap as breaching (alarm-test.sh, 2026-10-28). FILL turns the gap into zeros, so
+  # the alarm fires after 3 minutes.
   treat_missing_data = "breaching"
   alarm_actions      = local.health_actions
   ok_actions         = local.health_actions
+
+  metric_query {
+    id          = "healthy"
+    expression  = "FILL(m1, 0)"
+    label       = "HealthyHostCount, gaps as 0"
+    return_data = true
+  }
+
+  metric_query {
+    id = "m1"
+    metric {
+      namespace   = "AWS/ApplicationELB"
+      metric_name = "HealthyHostCount"
+      dimensions  = { LoadBalancer = module.ecs_cluster.alb_arn_suffix, TargetGroup = each.value }
+      stat        = "Minimum"
+      period      = 60
+    }
+  }
 }
 
 # A task that keeps failing its health check while another one still serves
