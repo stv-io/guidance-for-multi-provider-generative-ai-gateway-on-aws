@@ -41,7 +41,8 @@ the same step, or one prompt to each model in the Bedrock console playground.
 | Admin UI | **Pass.** Team with models and a monthly budget, a key inside it with its own budget and rpm limit, spend by key and team, request logs |
 
 Screen recordings of the admin and engineer journeys were made with `vhs` (terminal) and
-Playwright (Admin UI, key text blurred). They are not in the repo.
+Playwright (Admin UI, key text blurred). They play inline in the README (*Walkthrough videos*);
+the files are GitHub attachments, not in the repo.
 
 ## 4. Decision: run the PoC
 
