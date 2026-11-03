@@ -266,3 +266,9 @@ delete_repo() {
 # # Delete both repositories
 delete_repo "$APP_NAME"
 delete_repo "$MIDDLEWARE_APP_NAME"
+
+# Log groups that outlive the stacks: RDS creates its own for the PostgreSQL log export, and the
+# VPC flow log can write one more batch after Terraform deletes its group, recreating it
+for lg in $(aws logs describe-log-groups --query "logGroups[?starts_with(logGroupName, '/aws/rds/instance/${MAIN_STACK_NAME}-') || starts_with(logGroupName, '/aws/vpc/${MAIN_STACK_NAME}-flow-logs')].logGroupName" --output text); do
+    aws logs delete-log-group --log-group-name "$lg" && echo "Log group $lg deleted"
+done
