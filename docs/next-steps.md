@@ -13,20 +13,12 @@ Where the work stopped, and what to do next, in order.
   the Marketplace agreements for the Claude 5.5 models (account-level, no standing cost).
 - Last smoke run before the teardown (`ALL_MODELS=1`): **44 pass** of 44.
 
-## 1. Bring the sandbox back (about 30 minutes)
+## 1. Bring the sandbox back, and take it down again
 
-1. Check LiteLLM first: `scripts/litellm-bump.sh` moves to the newest patch on the current
-   line and refuses images that fail the digest, signature or provenance checks. Read the
-   release notes it lists. Commit the change on a branch.
-2. Build `.env`: `cat .env.template envs/sandbox.env > .env`, then set
-   `TERRAFORM_S3_BUCKET_NAME`, `HOSTED_ZONE_NAME` and `ALARM_EMAIL` (all stay out of git).
-3. `AWS_PROFILE=sandbox ./deploy.sh`. Off a terminal it stops after each plan with changes and
-   keeps it as `tfplan`: review it, `terraform apply tfplan`, rerun `deploy.sh`. A fresh deploy
-   is about 110 resources in the main stack and 4 in the log-bucket stack.
-4. Confirm the SNS subscription email (a new one is sent on every deploy), then
-   `AWS_PROFILE=sandbox ALL_MODELS=1 ./validation/smoke.sh`.
-
-See [`deployment.md`](deployment.md) → *Deploy the sandbox* for detail.
+Follow [`deployment.md`](deployment.md) → *Start and stop the sandbox*: about 30 minutes to start
+(deploy, confirm the SNS email, smoke test), one command to stop, and a check that nothing billable
+is left. Run `scripts/litellm-bump.sh` first, so the redeploy picks up the newest verified LiteLLM
+patch.
 
 ## 2. The Claude 5.5 models (done 2026-10-29)
 
@@ -49,7 +41,8 @@ the same step, or one prompt to each model in the Bedrock console playground.
 | Admin UI | **Pass.** Team with models and a monthly budget, a key inside it with its own budget and rpm limit, spend by key and team, request logs |
 
 Screen recordings of the admin and engineer journeys were made with `vhs` (terminal) and
-Playwright (Admin UI, key text blurred). They are not in the repo.
+Playwright (Admin UI, key text blurred). They play inline in the README (*Walkthrough videos*);
+the files are GitHub attachments, not in the repo.
 
 ## 4. Decision: run the PoC
 

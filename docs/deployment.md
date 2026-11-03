@@ -207,11 +207,63 @@ holds the new key, fetched from that commit and checked against the SHA-256 in t
 notes (`e3fe3e08c44b16407fe0b37c43b4f8b603b3a0f4ee74c29e647bc022d762c2c0`). Releases before v1.103.8,
 v1.104.6, v1.105.4 and v1.106.3 were signed with the old key and no longer verify.
 
-## Tear down
+## Start and stop the sandbox
+
+The sandbox costs about $2.50–3 a day while it is up (mostly NAT gateway, RDS, Valkey and
+Fargate), so it is torn down between test rounds. Starting it again takes about 30 minutes.
+
+### Start
+
+```bash
+aws sso login --profile sandbox                    # or any credentials for the account
+scripts/litellm-bump.sh                            # optional: newest LiteLLM patch, verified; commit it on a branch
+[ -f .env ] || cat .env.template envs/sandbox.env > .env
+# .env must set TERRAFORM_S3_BUCKET_NAME, HOSTED_ZONE_NAME and ALARM_EMAIL (git-ignored)
+rm -f config/config.yaml                           # regenerate from the model lists
+AWS_PROFILE=sandbox ./deploy.sh                    # about 110 resources + 4 on a fresh deploy
+```
+
+Then:
+
+1. Click the link in the *AWS Notification - Subscription Confirmation* email sent to
+   `ALARM_EMAIL`. A new one comes on every fresh deploy; until it is clicked, smoke test X2
+   fails and no alarm email is delivered.
+2. `AWS_PROFILE=sandbox ALL_MODELS=1 ./validation/smoke.sh`: expect 44 pass. A Bedrock 503 on
+   a single model is usually transient; rerun before investigating.
+3. The master key for the Admin UI (`https://<service-url>/ui/`, user `admin`) is in the
+   Secrets Manager secret `LiteLLMMasterSalt-*`, field `LITELLM_MASTER_KEY`. Keys and teams
+   created before the last teardown are gone with the database.
+
+In a new account, the Claude 5.5 models also need their one-time Marketplace agreement
+([`next-steps.md`](next-steps.md) → *The Claude 5.5 models*).
+
+### Stop
 
 ```bash
 AWS_PROFILE=sandbox ./undeploy.sh
 ```
+
+It does not ask for confirmation. It destroys the main stack, then the log-bucket stack
+(the access-log bucket and its contents included), deletes the two ECR repositories and the
+CloudWatch log groups that outlive the stacks (RDS PostgreSQL export, VPC flow logs). Both
+`terraform destroy` steps must end with `Destroy complete!`; if one fails, fix the cause and
+rerun `undeploy.sh`, which is safe to repeat.
+
+Check that nothing billable is left (each line should print nothing, or `0`):
+
+```bash
+export AWS_PROFILE=sandbox AWS_REGION=eu-west-1
+aws ecs list-clusters --query 'clusterArns' --output text
+aws rds describe-db-instances --query 'DBInstances[].DBInstanceIdentifier' --output text
+aws elasticache describe-replication-groups --query 'ReplicationGroups[].ReplicationGroupId' --output text
+aws ec2 describe-nat-gateways --filter Name=state,Values=available --query 'length(NatGateways)'
+aws cloudfront list-distributions --query 'DistributionList.Items[].DomainName' --output text
+aws logs describe-log-groups --log-group-name-prefix /aws/ --query 'logGroups[?contains(logGroupName, `litellm`)].logGroupName' --output text
+```
+
+What stays, on purpose: the Terraform state bucket (`TERRAFORM_S3_BUCKET_NAME`), the Route 53
+hosted zone (about $0.50 a month) and the Bedrock Marketplace agreements (no standing cost).
+Delete the first two by hand only when the sandbox is retired for good.
 
 ## Known limits and before-production items
 

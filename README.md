@@ -8,6 +8,33 @@
 > PoC criteria in [docs/poc-success-criteria.md](docs/poc-success-criteria.md) and the decisions
 > taken on this fork in [docs/decisions.md](docs/decisions.md).
 
+### Walkthrough videos (fork)
+
+Recorded against the sandbox on 2026-10-28 (hostname masked). The full walkthrough, about 5½ minutes:
+
+https://github.com/user-attachments/assets/b6d9cb01-16d7-44ce-bd95-f18bd01a6db2
+
+<details>
+<summary>The four parts on their own</summary>
+
+**1. Admin: create a team with a monthly budget, and a key inside it**
+
+https://github.com/user-attachments/assets/c1f454b5-9204-4c17-a7ae-5e3f66ab74d4
+
+**2. Engineer: call the gateway over the API and from an SDK**
+
+https://github.com/user-attachments/assets/324c4e72-578d-43ee-96f8-cf2bbb06fdb4
+
+**3. Engineer: a Claude Code session through the gateway**
+
+https://github.com/user-attachments/assets/ee156080-c866-4807-8ac3-b72051dbdc31
+
+**4. Admin: spend by key and team, and the request logs**
+
+https://github.com/user-attachments/assets/3cf08887-8d3c-41c9-8f7a-19a73b8aa66b
+
+</details>
+
 ## Table of contents
 
 - [Project Overview](#project-overview)
